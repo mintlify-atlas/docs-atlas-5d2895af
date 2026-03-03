@@ -1,0 +1,83 @@
+---
+title: "@gigadrive/commons"
+description: "Shared utilities for encryption, hashing, formatting, and common operations"
+---
+
+## Overview
+
+`@gigadrive/commons` is a collection of commonly used utility functions for the Gigadrive SDK. It provides type-safe, well-tested utilities for cryptography, data formatting, object manipulation, and asynchronous operations.
+
+## Installation
+
+```bash
+npm install @gigadrive/commons
+```
+
+## Key Features
+
+- **Encryption**: AES-GCM encryption and decryption functions
+- **Hashing**: SHA-256 hashing utilities
+- **Formatting**: File size and data formatting helpers
+- **Object Utilities**: Deep merging, query string conversion
+- **Async Utilities**: Concurrency control, sleep, and random number generation
+- **Stream Utilities**: Buffered readable streams
+
+## Package Structure
+
+The package is organized into the following modules:
+
+| Module | Description |
+|--------|-------------|
+| [Encryption](/api/commons/encryption) | `encrypt()`, `decrypt()` - AES-GCM encryption |
+| [Formatting](/api/commons/formatting) | `formatFileSize()` - Human-readable data formatting |
+| [Utilities](/api/commons/utilities) | `deepMerge()`, `sha256()`, `sleep()`, `randomIntInRange()`, and more |
+
+## Usage Example
+
+```typescript
+import { 
+  encrypt, 
+  decrypt, 
+  formatFileSize, 
+  deepMerge, 
+  sha256,
+  sleep 
+} from '@gigadrive/commons';
+
+// Encrypt sensitive data
+const encrypted = await encrypt('Hello, World!', 'mySecretKey');
+const decrypted = await decrypt(encrypted, 'mySecretKey');
+
+// Format file sizes
+const size = formatFileSize(123456789); // "117.74 MB"
+
+// Merge objects deeply
+const config = deepMerge(
+  { api: { timeout: 5000 } },
+  { api: { retries: 3 } }
+); // { api: { timeout: 5000, retries: 3 } }
+
+// Hash strings
+const hash = await sha256('hello world');
+
+// Delay execution
+await sleep(1000); // Wait 1 second
+```
+
+## TypeScript Support
+
+All functions are fully typed with TypeScript definitions included.
+
+```typescript
+import type { Buffer } from 'node:buffer';
+import { encrypt, decrypt } from '@gigadrive/commons';
+
+const message: string = 'secret data';
+const key: string = 'encryption-key';
+
+const encrypted: Promise<string> = encrypt(message, key);
+```
+
+## License
+
+Apache-2.0

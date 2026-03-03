@@ -1,0 +1,156 @@
+---
+title: "Encryption"
+description: "AES-GCM encryption and decryption functions for secure data handling"
+---
+
+## Overview
+
+The encryption module provides secure AES-GCM (Advanced Encryption Standard - Galois/Counter Mode) encryption and decryption functions. It uses SHA-256 to derive keys and generates random initialization vectors for each encryption operation.
+
+## Functions
+
+### encrypt()
+
+Encrypts a string using AES-GCM encryption with a provided key.
+
+```typescript
+import { encrypt } from '@gigadrive/commons';
+
+const encrypted = await encrypt('Hello, World!', 'mySecretKey');
+console.log(encrypted); // Base64 encoded encrypted string
+```
+
+<ParamField path="text" type="string" required>
+  The string to encrypt. Must not be empty.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  The encryption key. Can be any length. Will be hashed using SHA-256 to derive the actual encryption key.
+</ParamField>
+
+<ResponseField name="encrypted" type="Promise<string>">
+  Returns a Promise that resolves to the encrypted string in base64 format. The encrypted data includes the initialization vector (IV) prepended to the ciphertext.
+</ResponseField>
+
+**Throws:**
+- `Error` if text or key is empty/undefined
+
+---
+
+### decrypt()
+
+Decrypts a string that was encrypted using the `encrypt()` function.
+
+```typescript
+import { decrypt } from '@gigadrive/commons';
+
+const decrypted = await decrypt(encryptedString, 'mySecretKey');
+console.log(decrypted); // "Hello, World!"
+```
+
+<ParamField path="encryptedText" type="string" required>
+  The base64 encrypted string returned from `encrypt()`.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  The decryption key. Must be the same key used for encryption.
+</ParamField>
+
+<ResponseField name="decrypted" type="Promise<string>">
+  Returns a Promise that resolves to the decrypted plaintext string.
+</ResponseField>
+
+**Throws:**
+- `Error` if encrypted text or key is empty/undefined
+- `Error` if decryption fails due to invalid input or wrong key
+
+## Usage Examples
+
+### Basic Encryption and Decryption
+
+```typescript
+import { encrypt, decrypt } from '@gigadrive/commons';
+
+const key = 'myTestKey123';
+const message = 'Hello, World!';
+
+// Encrypt
+const encrypted = await encrypt(message, key);
+console.log('Encrypted:', encrypted);
+
+// Decrypt
+const decrypted = await decrypt(encrypted, key);
+console.log('Decrypted:', decrypted); // "Hello, World!"
+```
+
+### Handling Special Characters
+
+```typescript
+const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?`~™®©℗℠';
+const encrypted = await encrypt(specialChars, 'myKey');
+const decrypted = await decrypt(encrypted, 'myKey');
+
+console.log(decrypted === specialChars); // true
+```
+
+### Handling Unicode Characters
+
+```typescript
+const unicodeText = '你好，世界！🌍✨';
+const encrypted = await encrypt(unicodeText, 'myKey');
+const decrypted = await decrypt(encrypted, 'myKey');
+
+console.log(decrypted === unicodeText); // true
+```
+
+### Different Key Lengths
+
+```typescript
+// Short key
+const encrypted1 = await encrypt('test', 'a');
+const decrypted1 = await decrypt(encrypted1, 'a');
+
+// Long key
+const longKey = 'a'.repeat(100);
+const encrypted2 = await encrypt('test', longKey);
+const decrypted2 = await decrypt(encrypted2, longKey);
+```
+
+### Error Handling
+
+```typescript
+try {
+  // Wrong key will throw an error
+  const encrypted = await encrypt('secret', 'correctKey');
+  await decrypt(encrypted, 'wrongKey');
+} catch (error) {
+  console.error('Decryption failed:', error.message);
+  // "Failed to decrypt: Invalid input or key"
+}
+```
+
+## Security Notes
+
+<Note>
+  **Key Derivation**: The encryption key is hashed using SHA-256 before being used for AES-GCM encryption. This means you can use keys of any length.
+</Note>
+
+<Note>
+  **Random IV**: Each encryption operation generates a new random 12-byte initialization vector (IV), ensuring that encrypting the same plaintext with the same key produces different ciphertexts.
+</Note>
+
+<Warning>
+  **Key Storage**: Never hardcode encryption keys in your source code. Use environment variables or secure key management systems to store encryption keys.
+</Warning>
+
+## Technical Details
+
+- **Algorithm**: AES-GCM (256-bit key)
+- **Key Derivation**: SHA-256 hash of the provided key
+- **IV Length**: 12 bytes (96 bits)
+- **Output Format**: Base64 encoded string containing IV + ciphertext
+- **Encoding**: UTF-8 for text encoding/decoding
+
+## Source Code
+
+View the source code: [encrypt.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/encrypt.ts)

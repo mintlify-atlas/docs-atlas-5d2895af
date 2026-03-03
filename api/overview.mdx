@@ -1,0 +1,164 @@
+---
+title: API Reference
+description: Complete API reference for all Gigadrive SDK packages
+---
+
+The Gigadrive SDK is a monorepo containing multiple packages for building and deploying applications on the Gigadrive Network platform.
+
+## Installation
+
+Install the packages you need using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/sdk
+npm install @gigadrive/commons
+npm install @gigadrive/network-config
+npm install @gigadrive/build-utils
+npm install @gigadrive/harmony
+```
+
+```bash yarn
+yarn add @gigadrive/sdk
+yarn add @gigadrive/commons
+yarn add @gigadrive/network-config
+yarn add @gigadrive/build-utils
+yarn add @gigadrive/harmony
+```
+
+```bash pnpm
+pnpm add @gigadrive/sdk
+pnpm add @gigadrive/commons
+pnpm add @gigadrive/network-config
+pnpm add @gigadrive/build-utils
+pnpm add @gigadrive/harmony
+```
+
+```bash bun
+bun add @gigadrive/sdk
+bun add @gigadrive/commons
+bun add @gigadrive/network-config
+bun add @gigadrive/build-utils
+bun add @gigadrive/harmony
+```
+</CodeGroup>
+
+For the CLI tool:
+
+<CodeGroup>
+```bash npm
+npm install -g gigadrive
+```
+
+```bash yarn
+yarn global add gigadrive
+```
+
+```bash pnpm
+pnpm add -g gigadrive
+```
+
+```bash bun
+bun add -g gigadrive
+```
+</CodeGroup>
+
+## Packages
+
+<CardGroup cols={2}>
+  <Card title="@gigadrive/sdk" icon="cube" href="/api/sdk">
+    Core SDK package for the Gigadrive Network platform
+    
+    **Key Features:**
+    - Core SDK functionality
+    - Platform integration
+  </Card>
+
+  <Card title="@gigadrive/commons" icon="toolbox" href="/api/commons">
+    Shared utilities for encryption, hashing, formatting, and data manipulation
+    
+    **Key Exports:**
+    - `deepMerge` - Deep merge objects
+    - `encrypt` / `decrypt` - AES-256-GCM encryption
+    - `sha256` - SHA-256 hashing
+    - `formatBytes` / `formatDuration` - Data formatting
+    - `sleep` - Async delay utility
+    - `randomString` - Random string generation
+  </Card>
+
+  <Card title="@gigadrive/network-config" icon="file-code" href="/api/network-config">
+    Configuration parsing and validation for Gigadrive Network deployments
+    
+    **Key Exports:**
+    - `parseConfig` - Parse and validate config files
+    - `findConfig` - Locate config in project
+    - `NormalizedConfig` - Config type definitions
+    - `AVAILABLE_REGIONS` - Supported regions
+    - `AVAILABLE_RUNTIMES` - Supported runtimes
+    - Framework auto-detection (Next.js, Nuxt, etc.)
+  </Card>
+
+  <Card title="@gigadrive/build-utils" icon="wrench" href="/api/build-utils">
+    Build utilities for file operations, process execution, and downloads
+    
+    **Key Exports:**
+    - `exec` - Execute shell commands
+    - `downloadFile` - Download files from URLs
+    - `getFilesForPattern` - Glob pattern matching
+  </Card>
+
+  <Card title="@gigadrive/harmony" icon="palette" href="/api/harmony">
+    React UI component library built on Radix UI and Tailwind CSS
+    
+    **Key Components:**
+    - Button, Card, Dialog, Dropdown
+    - Data Table with sorting and filtering
+    - Form controls (Input, Select, Checkbox)
+    - Navigation (Tabs, Breadcrumb, Menu)
+    - 30+ production-ready components
+  </Card>
+
+  <Card title="gigadrive (CLI)" icon="terminal" href="/api/cli">
+    Command-line tool for managing deployments and projects
+    
+    **Commands:**
+    - `gigadrive login` - Authenticate with Gigadrive Network
+    - `gigadrive deploy` - Deploy applications
+    - `gigadrive whoami` - Show current user
+    - `gigadrive debug config` - Debug configuration
+    
+    **Aliases:** `gigadrive`, `gn`
+  </Card>
+</CardGroup>
+
+## Package Versions
+
+All packages follow semantic versioning and are published to npm with public access. The current versions are:
+
+- `@gigadrive/sdk`: 0.1.2
+- `@gigadrive/commons`: 2.1.1
+- `@gigadrive/network-config`: 3.0.1
+- `@gigadrive/build-utils`: 1.0.1
+- `@gigadrive/harmony`: 3.6.2
+- `gigadrive`: 2.1.1
+
+## TypeScript Support
+
+All packages are written in TypeScript and include full type definitions. They support:
+
+- **Target:** ES2022
+- **Module:** ES2022 with bundler resolution
+- **Strict mode:** Enabled
+- **Dual formats:** CommonJS and ESM
+
+## Requirements
+
+- **Node.js:** >= 18.0.0 (>= 20.0.0 for CLI)
+- **TypeScript:** >= 5.0.0 (for build-utils peer dependency)
+- **React:** >= 18.0.0 (for @gigadrive/harmony)
+
+## Repository
+
+All packages are maintained in the [Gigadrive SDK monorepo](https://github.com/Gigadrive/sdk) on GitHub.
+
+**License:** Apache-2.0

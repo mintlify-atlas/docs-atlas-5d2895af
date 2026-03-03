@@ -1,0 +1,603 @@
+---
+title: Building with Harmony
+description: Learn how to use Harmony UI components to build beautiful, accessible interfaces for your Gigadrive applications
+---
+
+Harmony is the official React UI component library for the Gigadrive SDK. Built on Radix UI primitives and styled with Tailwind CSS, Harmony provides production-ready components with built-in accessibility and dark mode support.
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    npm install @gigadrive/harmony
+    ```
+  </Step>
+
+  <Step title="Import styles">
+    Import the CSS in your application entry point:
+
+    ```tsx app/layout.tsx
+    import '@gigadrive/harmony/style.css';
+    ```
+
+    Or import styles individually:
+
+    ```tsx
+    import '@gigadrive/harmony/theme.css';  // Theme variables
+    import '@gigadrive/harmony/font.css';   // Resist Sans Text font
+    ```
+  </Step>
+
+  <Step title="Configure Tailwind (optional)">
+    If using Tailwind in your project, extend the Harmony theme:
+
+    ```js tailwind.config.js
+    module.exports = {
+      darkMode: ['class'],
+      content: [
+        './src/**/*.{ts,tsx}',
+        './node_modules/@gigadrive/harmony/**/*.{js,jsx}'
+      ],
+      theme: {
+        extend: {
+          colors: {
+            border: 'hsl(var(--border))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: {
+              DEFAULT: 'hsl(var(--primary))',
+              foreground: 'hsl(var(--primary-foreground))',
+            },
+          },
+        },
+      },
+    };
+    ```
+  </Step>
+</Steps>
+
+## Component Basics
+
+Harmony components follow consistent patterns for ease of use and customization.
+
+### Button Component
+
+<CodeGroup>
+```tsx Basic Usage
+import { Button } from '@gigadrive/harmony';
+
+export default function App() {
+  return (
+    <div>
+      <Button>Click me</Button>
+      <Button variant="destructive">Delete</Button>
+      <Button variant="outline">Cancel</Button>
+      <Button variant="ghost">Ghost</Button>
+    </div>
+  );
+}
+```
+
+```tsx With Variants
+import { Button } from '@gigadrive/harmony';
+
+export default function Variants() {
+  return (
+    <div className="flex gap-2">
+      <Button variant="default">Default</Button>
+      <Button variant="secondary">Secondary</Button>
+      <Button variant="destructive">Destructive</Button>
+      <Button variant="outline">Outline</Button>
+      <Button variant="ghost">Ghost</Button>
+      <Button variant="link">Link</Button>
+    </div>
+  );
+}
+```
+
+```tsx With Sizes
+import { Button } from '@gigadrive/harmony';
+
+export default function Sizes() {
+  return (
+    <div className="flex items-center gap-2">
+      <Button size="sm">Small</Button>
+      <Button size="default">Default</Button>
+      <Button size="lg">Large</Button>
+      <Button size="icon">⚡</Button>
+    </div>
+  );
+}
+```
+</CodeGroup>
+
+### Card Component
+
+Cards are versatile containers for grouping related content:
+
+```tsx
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Button
+} from '@gigadrive/harmony';
+
+export default function DeploymentCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Production Deployment</CardTitle>
+        <CardDescription>
+          Last deployed 2 hours ago
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Status</span>
+            <span className="text-sm font-medium">Active</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Region</span>
+            <span className="text-sm font-medium">us-east-1</span>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button wide>View Logs</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+```
+
+### Alert Component
+
+Display important messages with built-in variants:
+
+<CodeGroup>
+```tsx Info Alert
+import { Alert, AlertTitle, AlertDescription } from '@gigadrive/harmony';
+
+export default function InfoAlert() {
+  return (
+    <Alert variant="info">
+      <AlertTitle>Deployment in Progress</AlertTitle>
+      <AlertDescription>
+        Your application is being deployed to us-east-1. This typically takes 2-3 minutes.
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+
+```tsx Success Alert
+import { Alert, AlertTitle, AlertDescription } from '@gigadrive/harmony';
+
+export default function SuccessAlert() {
+  return (
+    <Alert variant="success">
+      <AlertTitle>Deployment Successful</AlertTitle>
+      <AlertDescription>
+        Your application is now live at https://app.example.com
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+
+```tsx Error Alert
+import { Alert, AlertTitle, AlertDescription } from '@gigadrive/harmony';
+
+export default function ErrorAlert() {
+  return (
+    <Alert variant="error">
+      <AlertTitle>Build Failed</AlertTitle>
+      <AlertDescription>
+        npm install failed with exit code 1. Check your dependencies.
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+</CodeGroup>
+
+## Form Components
+
+### Input with Label
+
+```tsx
+import { Input } from '@gigadrive/harmony';
+
+export default function ConfigForm() {
+  return (
+    <div className="space-y-4">
+      <Input
+        label="Application Name"
+        placeholder="my-app"
+        helpText="Choose a unique name for your application"
+      />
+      
+      <Input
+        label="API Key"
+        type="password"
+        error="API key must be at least 32 characters"
+      />
+    </div>
+  );
+}
+```
+
+### Input with Icons
+
+```tsx
+import { Input } from '@gigadrive/harmony';
+import { Search, Loader } from 'lucide-react';
+
+export default function SearchInput() {
+  return (
+    <div className="space-y-4">
+      <Input
+        placeholder="Search deployments..."
+        leftElement={<Search className="h-4 w-4 text-muted-foreground" />}
+      />
+      
+      <Input
+        placeholder="Loading..."
+        disabled
+        rightElement={<Loader className="h-4 w-4 animate-spin" />}
+      />
+    </div>
+  );
+}
+```
+
+## Advanced Components
+
+### Data Table
+
+Display tabular data with sorting, filtering, and pagination:
+
+```tsx
+import { DataTable, useDataTable } from '@gigadrive/harmony';
+import { ColumnDef } from '@tanstack/react-table';
+
+interface Deployment {
+  id: string;
+  name: string;
+  status: 'active' | 'building' | 'failed';
+  region: string;
+  createdAt: Date;
+}
+
+const columns: ColumnDef<Deployment>[] = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+  },
+  {
+    accessorKey: 'status',
+    header: 'Status',
+  },
+  {
+    accessorKey: 'region',
+    header: 'Region',
+  },
+];
+
+export default function DeploymentTable() {
+  const deployments: Deployment[] = [
+    {
+      id: 'dep-1',
+      name: 'production',
+      status: 'active',
+      region: 'us-east-1',
+      createdAt: new Date(),
+    },
+    // ... more deployments
+  ];
+
+  const table = useDataTable({
+    data: deployments,
+    columns,
+  });
+
+  return <DataTable table={table} />;
+}
+```
+
+### Dialog (Modal)
+
+Create accessible modal dialogs:
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from '@gigadrive/harmony';
+import { useState } from 'react';
+
+export default function DeleteDeploymentDialog() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button onClick={() => setOpen(true)} variant="destructive">
+        Delete Deployment
+      </Button>
+      
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Are you sure?</DialogTitle>
+          <DialogDescription>
+            This action cannot be undone. This will permanently delete your
+            deployment and remove all associated data.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={() => {
+            // Handle deletion
+            setOpen(false);
+          }}>
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### Tabs
+
+Organize content into tabbed sections:
+
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@gigadrive/harmony';
+
+export default function DeploymentTabs() {
+  return (
+    <Tabs defaultValue="overview">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="logs">Logs</TabsTrigger>
+        <TabsTrigger value="settings">Settings</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="overview">
+        <p>Deployment overview content</p>
+      </TabsContent>
+      
+      <TabsContent value="logs">
+        <p>Build and runtime logs</p>
+      </TabsContent>
+      
+      <TabsContent value="settings">
+        <p>Deployment configuration</p>
+      </TabsContent>
+    </Tabs>
+  );
+}
+```
+
+## Dark Mode Support
+
+Harmony includes built-in dark mode support using Tailwind's class strategy:
+
+```tsx
+import { useEffect, useState } from 'react';
+
+export default function ThemeToggle() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    // Check system preference
+    const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDark(isDarkMode);
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  return (
+    <Button onClick={toggleTheme}>
+      {isDark ? '☀️ Light' : '🌙 Dark'}
+    </Button>
+  );
+}
+```
+
+## Utility Functions
+
+Harmony exports useful utilities:
+
+```tsx
+import { cn, wrapTextNodes, getInitials } from '@gigadrive/harmony/lib';
+
+// Merge Tailwind classes
+const buttonClass = cn(
+  'px-4 py-2 rounded',
+  'bg-blue-500 hover:bg-blue-600',
+  props.disabled && 'opacity-50 cursor-not-allowed'
+);
+
+// Extract initials from name
+const initials = getInitials('John Doe'); // "JD"
+
+// Wrap text nodes (used internally by Button)
+const wrapped = wrapTextNodes(children);
+```
+
+## Component Customization
+
+All Harmony components accept a `className` prop for customization:
+
+```tsx
+import { Button, Card, CardContent } from '@gigadrive/harmony';
+
+export default function CustomStyles() {
+  return (
+    <Card className="border-2 border-blue-500">
+      <CardContent className="p-8">
+        <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+          Custom Gradient Button
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Semantic HTML" icon="code">
+    Harmony components render semantic HTML with proper ARIA attributes for accessibility.
+  </Card>
+  
+  <Card title="Compose Components" icon="layer-group">
+    Build complex UIs by composing simple components together.
+  </Card>
+  
+  <Card title="Leverage Variants" icon="palette">
+    Use built-in variant props instead of overriding styles.
+  </Card>
+  
+  <Card title="Dark Mode First" icon="moon">
+    Test your UI in both light and dark modes during development.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Harmony uses `class-variance-authority` for variant management. When adding custom classes, use the `cn()` utility to properly merge Tailwind classes.
+</Warning>
+
+## Complete Example: Deployment Dashboard
+
+```tsx
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  Badge
+} from '@gigadrive/harmony';
+
+interface DeploymentStatus {
+  id: string;
+  name: string;
+  status: 'active' | 'building' | 'failed';
+  region: string;
+  url: string;
+}
+
+export default function DeploymentDashboard() {
+  const deployments: DeploymentStatus[] = [
+    {
+      id: 'dep-1',
+      name: 'Production',
+      status: 'active',
+      region: 'us-east-1',
+      url: 'https://app.example.com',
+    },
+    {
+      id: 'dep-2',
+      name: 'Staging',
+      status: 'building',
+      region: 'eu-west-1',
+      url: 'https://staging.example.com',
+    },
+  ];
+
+  return (
+    <div className="space-y-6 p-8">
+      <div>
+        <h1 className="text-3xl font-bold">Deployments</h1>
+        <p className="text-muted-foreground">Manage your application deployments</p>
+      </div>
+
+      <Alert variant="info">
+        <AlertTitle>New Region Available</AlertTitle>
+        <AlertDescription>
+          Asia Pacific (Sydney) is now available for deployments.
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {deployments.map((deployment) => (
+          <Card key={deployment.id}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{deployment.name}</CardTitle>
+                <Badge
+                  variant={deployment.status === 'active' ? 'success' : 'default'}
+                >
+                  {deployment.status}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Region</span>
+                  <span className="font-medium">{deployment.region}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">URL</span>
+                  <a
+                    href={deployment.url}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {deployment.url}
+                  </a>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Button size="sm" wide>
+                  View Logs
+                </Button>
+                <Button size="sm" variant="outline" wide>
+                  Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Component Reference" icon="book" href="/api-reference/harmony/components">
+    Browse all available components
+  </Card>
+  
+  <Card title="Theming Guide" icon="palette" href="/essentials/theming">
+    Customize Harmony's design tokens
+  </Card>
+  
+  <Card title="Accessibility" icon="universal-access" href="/essentials/accessibility">
+    Learn about Harmony's accessibility features
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples/harmony">
+    View complete example applications
+  </Card>
+</CardGroup>

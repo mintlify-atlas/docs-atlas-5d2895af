@@ -1,0 +1,139 @@
+---
+title: "@gigadrive/network-config"
+description: "Configuration parsing library for Gigadrive Network deployments"
+---
+
+## Overview
+
+The `@gigadrive/network-config` package is a configuration parsing library that handles YAML/JSON config files, Vercel Build Output v3 translation, region/runtime mapping, and schema validation for Gigadrive Network deployments.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/network-config
+```
+
+```bash yarn
+yarn add @gigadrive/network-config
+```
+
+```bash pnpm
+pnpm add @gigadrive/network-config
+```
+
+```bash bun
+bun add @gigadrive/network-config
+```
+</CodeGroup>
+
+## Features
+
+- **Config File Parsing**: Parse YAML and JSON configuration files with v4 schema validation
+- **Framework Detection**: Automatically detect frameworks and generate deployment configurations
+- **Vercel Build Output v3**: Transform Vercel Build Output v3 to Gigadrive Network format
+- **Region & Runtime Translation**: Map Vercel regions and runtimes to Gigadrive equivalents
+- **Schema Validation**: Validate configs using AJV with JSON Schema
+- **Effect-based**: Built with Effect for composable, type-safe error handling
+
+## Key Concepts
+
+### NormalizedConfig
+
+All configuration versions are parsed into a unified `NormalizedConfig` structure that provides a consistent interface for deployment provisioning:
+
+```typescript
+interface NormalizedConfig {
+  regions: Region[];
+  assets?: {
+    paths?: string[];
+    prefixToStrip?: string;
+    overrides?: Record<string, { path?: string; contentType?: string }>;
+    dynamicRoutes?: boolean;
+    populateCache?: boolean;
+  };
+  environmentVariables: Record<string, string>;
+  commands: string[];
+  entrypoints: Array<NormalizedConfigEntrypoint>;
+  routes: Array<NormalizedConfigRoute>;
+  services?: Array<NormalizedConfigService>;
+  userArchive?: {
+    rootOverwrite?: string;
+    fileWhitelist?: string[];
+  };
+  excludeFiles?: string[];
+  warnings: string[];
+  errors: string[];
+}
+```
+
+### Config V4 Schema
+
+The v4 configuration schema supports:
+
+- **version**: Must be `4` (required)
+- **presets**: URI references to preset configurations
+- **assets**: Static asset folder path
+- **populateAssetCache**: Edge cache population during deployment
+- **regions**: Deployment target regions (or "global")
+- **build_commands**: Build pipeline commands
+- **functions**: Serverless function definitions with glob patterns
+- **routes**: HTTP routing rules with pattern matching
+- **env**: Environment variables
+- **services**: Additional services (Redis, Postgres)
+
+### Available Regions
+
+```typescript
+type Region =
+  | 'us-east-1' | 'us-east-2' | 'us-west-1' | 'us-west-2'
+  | 'ap-south-1' | 'ap-northeast-3' | 'ap-northeast-2'
+  | 'ap-southeast-1' | 'ap-southeast-2' | 'ap-northeast-1'
+  | 'ca-central-1'
+  | 'eu-central-1' | 'eu-west-1' | 'eu-west-2' | 'eu-west-3' | 'eu-north-1'
+  | 'sa-east-1';
+```
+
+### Available Runtimes
+
+```typescript
+type Runtime =
+  | 'php-84' | 'php-83' | 'php-81'
+  | 'node-22' | 'node-20' | 'node-18' | 'node-16'
+  | 'bun-1';
+```
+
+## Architecture
+
+The package uses **Effect** with `@effect/platform` for functional composition:
+
+- Functions return `Effect.Effect<T, E, R>` instead of Promises
+- File I/O uses `FileSystem.FileSystem` from `@effect/platform`
+- Errors use `Schema.TaggedError` for type-safe error handling
+- Services are provided via Effect's dependency injection
+
+## Usage
+
+See the following guides for detailed usage:
+
+<CardGroup cols={2}>
+  <Card title="Parsing Configs" icon="file-code" href="/api/network-config/parsing">
+    Learn how to parse, validate, and locate configuration files
+  </Card>
+  <Card title="Framework Detection" icon="robot" href="/api/network-config/detection">
+    Automatically detect frameworks and generate configs
+  </Card>
+  <Card title="Build Output v3" icon="box" href="/api/network-config/build-output">
+    Work with Vercel Build Output API v3
+  </Card>
+</CardGroup>
+
+## Dependencies
+
+- **ajv / ajv-formats**: JSON Schema validation
+- **yaml**: YAML parsing
+- **minimatch**: Glob pattern matching
+- **effect**: Functional effect system
+- **@effect/platform**: Platform abstractions
+- **@gigadrive/commons**: Shared utilities
+- **@gigadrive/build-utils**: Build utilities

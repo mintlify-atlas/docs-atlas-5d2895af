@@ -1,0 +1,525 @@
+---
+title: Harmony Utilities
+description: Utility functions for styling, string manipulation, and component helpers in the Harmony library
+---
+
+# Utilities
+
+Harmony provides several utility functions for common operations like class name merging, text processing, and string manipulation.
+
+## cn
+
+Merge and deduplicate Tailwind CSS class names intelligently.
+
+```tsx
+import { cn } from '@gigadrive/harmony';
+
+const className = cn(
+  'px-4 py-2 bg-blue-500',
+  'px-6', // Overrides px-4
+  condition && 'font-bold',
+  { 'text-white': isActive }
+);
+// Result: "py-2 bg-blue-500 px-6 font-bold text-white"
+```
+
+### Signature
+
+```typescript
+function cn(...inputs: ClassValue[]): string
+```
+
+### Parameters
+
+<ParamField path="inputs" type="ClassValue[]">
+  Variable number of class values. Each can be:
+  - String: `"px-4 py-2"`
+  - Object: `{ 'font-bold': condition }`
+  - Array: `['text-sm', condition && 'text-red-500']`
+  - Falsy values are ignored
+</ParamField>
+
+### Return Value
+
+<ResponseField name="className" type="string">
+  Merged and deduplicated class name string.
+</ResponseField>
+
+### How It Works
+
+`cn` combines two powerful libraries:
+
+1. **clsx** — Conditionally construct className strings
+2. **tailwind-merge** — Intelligently merge conflicting Tailwind classes
+
+```tsx
+// Without cn
+const className = `px-4 py-2 ${isLarge ? 'px-8' : ''}`;
+// Result: "px-4 py-2 px-8" (both px-4 and px-8 applied! ❌)
+
+// With cn
+const className = cn('px-4 py-2', isLarge && 'px-8');
+// Result: "py-2 px-8" (px-4 removed, only px-8 applied ✅)
+```
+
+### Examples
+
+#### Conditional Classes
+
+```tsx
+<Button 
+  className={cn(
+    'text-white',
+    isPrimary && 'bg-blue-500',
+    isDisabled && 'opacity-50 cursor-not-allowed'
+  )}
+>
+  Click me
+</Button>
+```
+
+#### Overriding Component Defaults
+
+```tsx
+function Card({ className, ...props }) {
+  return (
+    <div 
+      className={cn(
+        'rounded-lg border bg-card p-6', // defaults
+        className // user overrides
+      )}
+      {...props}
+    />
+  );
+}
+
+// Usage - p-4 overrides p-6
+<Card className="p-4 shadow-lg" />
+// Result: "rounded-lg border bg-card shadow-lg p-4"
+```
+
+#### Using Objects
+
+```tsx
+const buttonClass = cn({
+  'bg-blue-500': variant === 'primary',
+  'bg-gray-500': variant === 'secondary',
+  'text-sm': size === 'small',
+  'text-base': size === 'medium',
+});
+```
+
+#### Variant Composition
+
+```tsx
+const baseStyles = 'rounded-md font-medium transition-colors';
+const variantStyles = {
+  primary: 'bg-blue-500 text-white hover:bg-blue-600',
+  secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
+};
+
+const className = cn(
+  baseStyles,
+  variantStyles[variant],
+  className // allow external overrides
+);
+```
+
+---
+
+## wrapTextNodes
+
+Wraps text nodes in a React element tree with `<span>` elements while preserving other elements. Useful for applying typography corrections or animations to text content.
+
+```tsx
+import { wrapTextNodes } from '@gigadrive/harmony';
+
+function Component({ children }) {
+  return <div>{wrapTextNodes(children, 'text-correction')}</div>;
+}
+```
+
+### Signature
+
+```typescript
+function wrapTextNodes(
+  children: React.ReactNode | string | number | null | undefined,
+  className?: string
+): React.ReactNode
+```
+
+### Parameters
+
+<ParamField path="children" type="ReactNode | string | number | null | undefined">
+  The React children to process.
+</ParamField>
+
+<ParamField path="className" type="string" default="mt-[var(--text-correction)]">
+  CSS class name to apply to the wrapping `<span>` elements.
+</ParamField>
+
+### Return Value
+
+<ResponseField name="children" type="ReactNode">
+  Processed children with text nodes wrapped in `<span>` elements.
+</ResponseField>
+
+### Behavior
+
+- **Text/Number nodes**: Wrapped in `<span className={className}>`
+- **React elements**: Preserved as-is, but children are recursively processed
+- **Fragments**: Unwrapped and children are processed
+- **Null/undefined**: Ignored
+
+### Examples
+
+#### Basic Usage
+
+```tsx
+const children = wrapTextNodes(
+  <>Hello <strong>world</strong>!</>,
+  'font-correction'
+);
+
+// Result:
+// <>
+//   <span className="font-correction">Hello </span>
+//   <strong>
+//     <span className="font-correction">world</span>
+//   </strong>
+//   <span className="font-correction">!</span>
+// </>
+```
+
+#### Typography Corrections
+
+```tsx
+function Button({ children }) {
+  return (
+    <button className="button">
+      {wrapTextNodes(children, 'mt-[var(--text-correction)]')}
+    </button>
+  );
+}
+
+// Usage
+<Button>Click me</Button>
+// Rendered: <button><span class="mt-[var(--text-correction)]">Click me</span></button>
+```
+
+#### Preserving Elements
+
+```tsx
+const content = (
+  <div>
+    Text before
+    <Icon />
+    Text after
+  </div>
+);
+
+wrapTextNodes(content, 'wrapper');
+
+// Result:
+// <div>
+//   <span className="wrapper">Text before</span>
+//   <Icon />
+//   <span className="wrapper">Text after</span>
+// </div>
+```
+
+### Use Cases
+
+1. **Font Rendering Corrections**: Apply vertical offset to compensate for font metrics
+2. **Text Animations**: Wrap each text node for individual animations
+3. **Accessibility**: Add screen reader hints to text nodes
+4. **Typography Utilities**: Apply consistent text processing across components
+
+<Note>
+`wrapTextNodes` is used internally by `Button` and `Badge` components to apply typography corrections.
+</Note>
+
+---
+
+## getInitials
+
+Extract uppercase initials from a name-like string.
+
+```tsx
+import { getInitials } from '@gigadrive/harmony';
+
+getInitials('John Doe');           // "JD"
+getInitials('single-word');        // "SW"
+getInitials('Alice');              // "AL"
+getInitials('first middle last');  // "FL"
+```
+
+### Signature
+
+```typescript
+function getInitials(input: string): string
+```
+
+### Parameters
+
+<ParamField path="input" type="string">
+  Name or identifier string.
+</ParamField>
+
+### Return Value
+
+<ResponseField name="initials" type="string">
+  Two uppercase characters representing the initials.
+</ResponseField>
+
+### Rules
+
+1. **Multi-word**: First letter of first word + first letter of last word
+   ```tsx
+   getInitials('John Doe')        // "JD"
+   getInitials('John M. Doe')     // "JD" (middle ignored)
+   ```
+
+2. **Single hyphenated word**: First letter of first segment + first letter of last segment
+   ```tsx
+   getInitials('north-west')      // "NW"
+   getInitials('foo-bar-baz')     // "FB"
+   ```
+
+3. **Single word**: First two characters
+   ```tsx
+   getInitials('Alice')           // "AL"
+   getInitials('AB')              // "AB"
+   ```
+
+4. **Special handling**:
+   - Underscores converted to spaces: `"hello_world"` → `"HW"`
+   - Repeated whitespace collapsed: `"John  Doe"` → `"JD"`
+   - Non-alphanumeric characters skipped
+   - Empty string returns `""`
+
+### Examples
+
+#### Avatar Fallback
+
+```tsx
+import { Avatar, AvatarFallback, AvatarImage } from '@gigadrive/harmony';
+import { getInitials } from '@gigadrive/harmony';
+
+function UserAvatar({ user }) {
+  return (
+    <Avatar>
+      <AvatarImage src={user.avatar} />
+      <AvatarFallback>
+        {getInitials(user.name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+```
+
+<Note>
+`AvatarFallback` automatically calls `getInitials` when given a string, so you don't need to call it manually in that context.
+</Note>
+
+#### User List
+
+```tsx
+function UserList({ users }) {
+  return (
+    <ul>
+      {users.map(user => (
+        <li key={user.id}>
+          <span className="initials">
+            {getInitials(user.name)}
+          </span>
+          {user.name}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+#### Edge Cases
+
+```tsx
+getInitials('')                    // ""
+getInitials('   ')                 // ""
+getInitials('123')                 // "12"
+getInitials('John-Paul Doe')       // "JD" (hyphen in first word treated as part of word)
+getInitials('hello_world')         // "HW" (underscore becomes space)
+getInitials('a')                   // "A" (single character)
+getInitials('@#$%')                // "" (no alphanumeric chars)
+```
+
+### Algorithm Details
+
+1. Replace all underscores with spaces
+2. Trim and collapse repeated whitespace
+3. Split by spaces into words
+4. If single word:
+   - Check for hyphens → use first char of first segment + first char of last segment
+   - Otherwise → use first two characters
+5. If multiple words:
+   - Use first char of first word + first char of last word (before any hyphen)
+6. Convert to uppercase
+
+---
+
+## classNames
+
+Simple utility to join class names (legacy).
+
+```tsx
+import { classNames } from '@gigadrive/harmony';
+
+const className = classNames('px-4', 'py-2', condition && 'font-bold');
+// Result: "px-4 py-2 font-bold"
+```
+
+<Warning>
+**Deprecated**: Use `cn()` instead. `classNames` does not handle Tailwind class conflicts.
+</Warning>
+
+### Signature
+
+```typescript
+function classNames(...classes: string[]): string
+```
+
+This is a simple implementation that filters out falsy values and joins with spaces. It does **not** deduplicate or merge Tailwind classes.
+
+---
+
+## Usage Patterns
+
+### Building Custom Components
+
+```tsx
+import { cn } from '@gigadrive/harmony';
+import { forwardRef } from 'react';
+
+interface CustomCardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: 'default' | 'bordered';
+}
+
+const CustomCard = forwardRef<HTMLDivElement, CustomCardProps>(
+  ({ className, variant = 'default', ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'rounded-lg p-6',
+          variant === 'bordered' && 'border-2 border-primary',
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+```
+
+### Extracting User Data
+
+```tsx
+import { getInitials } from '@gigadrive/harmony';
+
+function formatUser(user: User) {
+  return {
+    ...user,
+    initials: getInitials(user.fullName),
+    displayName: user.fullName || user.username,
+  };
+}
+```
+
+### Typography Utilities
+
+```tsx
+import { wrapTextNodes } from '@gigadrive/harmony';
+
+function AnimatedText({ children }) {
+  return (
+    <div className="animate-fade-in">
+      {wrapTextNodes(children, 'animate-slide-up')}
+    </div>
+  );
+}
+```
+
+## Performance Notes
+
+### cn
+
+- Optimized for Tailwind CSS class merging
+- Minimal overhead (uses native string operations)
+- Safe to use in render functions
+
+### wrapTextNodes
+
+- Recursively processes React element tree
+- Creates new elements (may impact performance with large trees)
+- Consider memoizing the result for static content:
+
+```tsx
+const wrappedContent = useMemo(
+  () => wrapTextNodes(children, className),
+  [children, className]
+);
+```
+
+### getInitials
+
+- Pure function with no side effects
+- Minimal string operations
+- Safe to call on every render
+- Results can be cached if input is stable:
+
+```tsx
+const initials = useMemo(() => getInitials(name), [name]);
+```
+
+## Type Definitions
+
+```typescript
+// From clsx
+type ClassValue = 
+  | string 
+  | number 
+  | ClassDictionary 
+  | ClassArray 
+  | undefined 
+  | null 
+  | boolean;
+
+interface ClassDictionary {
+  [id: string]: boolean | undefined | null;
+}
+
+type ClassArray = ClassValue[];
+
+// Harmony utilities
+function cn(...inputs: ClassValue[]): string;
+
+function wrapTextNodes(
+  children: React.ReactNode | string | number | null | undefined,
+  className?: string
+): React.ReactNode;
+
+function getInitials(input: string): string;
+
+function classNames(...classes: string[]): string;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="grid" href="/api/harmony/components">
+    See how utilities are used in Harmony components
+  </Card>
+  <Card title="GitHub" icon="github" href="/home/daytona/workspace/source/packages/harmony/src/lib/utils.ts">
+    View source code on GitHub
+  </Card>
+</CardGroup>

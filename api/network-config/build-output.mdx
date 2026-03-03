@@ -1,0 +1,430 @@
+---
+title: "Vercel Build Output v3"
+description: "Transform Vercel Build Output API v3 to Gigadrive Network format"
+---
+
+## Overview
+
+The Build Output v3 module provides support for transforming Vercel's Build Output API v3 to Gigadrive Network's deployment format. This enables seamless migration of projects built with Vercel's build system.
+
+## How It Works
+
+When you call `parseConfig` or `postProcessConfig`, the system automatically:
+
+1. Checks for `.vercel/output/config.json` in the project folder
+2. If found and version >= 3, scans for function configs in `.vercel/output/functions/`
+3. Translates Vercel runtime and region codes to Gigadrive equivalents
+4. Merges the functions and routes into the parsed config
+5. Sets up monorepo-aware file packaging
+
+## Core Service
+
+### VercelBuildOutputParser
+
+Effect service that handles Vercel Build Output v3 transformation.
+
+```typescript
+export class VercelBuildOutputParser extends Effect.Service<VercelBuildOutputParser>()
+```
+
+#### parse
+
+Transforms a parsed config using Vercel's Build Output API v3.
+
+```typescript
+const parse: Effect.Effect<
+  NormalizedConfig,
+  ConfigFileParseError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="parseResult" type="NormalizedConfig" required>
+  The base NormalizedConfig to merge with
+</ParamField>
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<NormalizedConfig>">
+  Effect that returns the merged configuration with Vercel Build Output v3 data
+</ResponseField>
+
+##### Example
+
+```typescript
+import { VercelBuildOutputParser } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = Effect.gen(function* () {
+  const parser = yield* VercelBuildOutputParser;
+  const config = yield* parser.parse(baseConfig, '/path/to/project');
+  return config;
+});
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+## Translation Functions
+
+### translateVercelRuntime
+
+Translates Vercel runtime identifiers to Gigadrive Runtime types.
+
+```typescript
+export const translateVercelRuntime: (runtime: string) => Runtime | null
+```
+
+<ParamField path="runtime" type="string" required>
+  Vercel runtime identifier (e.g., `'nodejs20.x'`, `'php@8.3'`)
+</ParamField>
+
+<ResponseField name="return" type="Runtime | null">
+  Gigadrive runtime, or `null` if unsupported
+</ResponseField>
+
+#### Supported Mappings
+
+| Vercel Runtime | Gigadrive Runtime |
+|----------------|-------------------|
+| `nodejs22.x` | `node-22` |
+| `nodejs20.x` | `node-20` |
+| `nodejs18.x` | `node-18` |
+| `nodejs16.x` | `node-16` |
+| `php@8.4` | `php-84` |
+| `php@8.3` | `php-83` |
+| `php@8.1` | `php-81` |
+| `bun@1.x` | `bun-1` |
+
+#### Example
+
+```typescript
+import { translateVercelRuntime } from '@gigadrive/network-config';
+
+const runtime = translateVercelRuntime('nodejs20.x');
+// => 'node-20'
+
+const unsupported = translateVercelRuntime('python3.9');
+// => null
+```
+
+---
+
+### translateVercelRegion
+
+Translates Vercel region codes to Gigadrive Region types.
+
+```typescript
+export const translateVercelRegion: (region: string) => Region
+```
+
+<ParamField path="region" type="string" required>
+  Vercel region identifier (e.g., `'iad1'`, `'sfo1'`)
+</ParamField>
+
+<ResponseField name="return" type="Region">
+  Gigadrive region. Defaults to `'us-east-1'` if the region is not recognized.
+</ResponseField>
+
+#### Supported Mappings
+
+| Vercel Region | Gigadrive Region | Description |
+|---------------|------------------|-------------|
+| `iad1` | `us-east-1` | Washington, D.C., USA |
+| `cle1` | `us-east-2` | Cleveland, USA |
+| `pdx1` | `us-west-1` | Portland, USA |
+| `sfo1` | `us-west-2` | San Francisco, USA |
+| `bom1` | `ap-south-1` | Mumbai, India |
+| `kix1` | `ap-northeast-3` | Osaka, Japan |
+| `icn1` | `ap-northeast-2` | Seoul, South Korea |
+| `sin1` | `ap-southeast-1` | Singapore |
+| `syd1` | `ap-southeast-2` | Sydney, Australia |
+| `hnd1` | `ap-northeast-1` | Tokyo, Japan |
+| `yul1` | `ca-central-1` | Montreal, Canada |
+| `fra1` | `eu-central-1` | Frankfurt, Germany |
+| `dub1` | `eu-west-1` | Dublin, Ireland |
+| `lhr1` | `eu-west-2` | London, United Kingdom |
+| `cdg1` | `eu-west-3` | Paris, France |
+| `arn1` | `eu-north-1` | Stockholm, Sweden |
+| `gru1` | `sa-east-1` | São Paulo, Brazil |
+
+#### Example
+
+```typescript
+import { translateVercelRegion } from '@gigadrive/network-config';
+
+const region = translateVercelRegion('iad1');
+// => 'us-east-1'
+
+const unknown = translateVercelRegion('unknown');
+// => 'us-east-1' (default fallback)
+```
+
+## Utility Functions
+
+### determineRepoRoot
+
+Detects the monorepo root from the current working directory by searching for workspace configuration files.
+
+```typescript
+export const determineRepoRoot: (
+  projectFolder: string,
+  config: Partial<NormalizedConfig>
+) => string | undefined
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Current project folder (absolute path)
+</ParamField>
+
+<ParamField path="config" type="Partial<NormalizedConfig>" required>
+  Parsed config (used for logging errors)
+</ParamField>
+
+<ResponseField name="return" type="string | undefined">
+  Absolute path to the monorepo root, or `undefined` if not in a monorepo
+</ResponseField>
+
+#### Detection Logic
+
+Searches parent directories for:
+- `pnpm-workspace.yaml`
+- `package.json` with `workspaces` field
+- `lerna.json`
+
+#### Example
+
+```typescript
+import { determineRepoRoot } from '@gigadrive/network-config';
+
+const root = determineRepoRoot('/path/to/monorepo/packages/app', config);
+// => '/path/to/monorepo'
+```
+
+---
+
+### getDefaultPathMap
+
+Generates a default file path map for a function directory, mapping absolute source paths to relative deployment paths.
+
+```typescript
+export const getDefaultPathMap: Effect.Effect<
+  Record<string, string>,
+  never,
+  FileSystem.FileSystem
+>
+```
+
+<ParamField path="functionDirectory" type="string" required>
+  Absolute path to the function directory (e.g., `.vercel/output/functions/api.func`)
+</ParamField>
+
+<ResponseField name="return" type="Effect<Record<string, string>>">
+  Effect that returns a mapping of absolute paths to relative paths
+</ResponseField>
+
+#### Example
+
+```typescript
+import { getDefaultPathMap } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = getDefaultPathMap('/path/to/project/.vercel/output/functions/api.func');
+
+const pathMap = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+
+// Example result:
+// {
+//   '/path/to/project/.vercel/output/functions/api.func/index.js': 'index.js',
+//   '/path/to/project/.vercel/output/functions/api.func/utils.js': 'utils.js'
+// }
+```
+
+---
+
+### getMonorepoFiles
+
+Lists files shared across a monorepo that should be included in the deployment archive. Analyzes file path maps from all functions to determine which files are outside the project directory.
+
+```typescript
+export const getMonorepoFiles: (
+  projectFolder: string,
+  filePathMaps: Array<Record<string, string>>
+) => string[]
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ParamField path="filePathMaps" type="Array<Record<string, string>>" required>
+  Array of file path maps from all functions
+</ParamField>
+
+<ResponseField name="return" type="string[]">
+  Array of file paths to include (glob patterns)
+</ResponseField>
+
+#### Example
+
+```typescript
+import { getMonorepoFiles } from '@gigadrive/network-config';
+
+const monorepoFiles = getMonorepoFiles('/path/to/monorepo/packages/app', [
+  {
+    '/path/to/monorepo/shared/utils.js': 'utils.js',
+    '/path/to/monorepo/packages/app/index.js': 'index.js',
+  },
+]);
+
+// => ['/path/to/monorepo/shared/utils.js']
+```
+
+## Vercel Build Output v3 Types
+
+The package includes comprehensive TypeScript types for Vercel's Build Output API v3:
+
+### Config
+
+Main configuration file (`.vercel/output/config.json`):
+
+```typescript
+export type Config = {
+  version: 3;
+  routes?: Route[];
+  images?: ImagesConfig;
+  wildcard?: WildcardConfig;
+  overrides?: OverrideConfig;
+  cache?: string[];
+  crons?: CronsConfig;
+};
+```
+
+### ServerlessFunctionConfig
+
+Function configuration (`.vercel/output/functions/**/*.func/.vc-config.json`):
+
+```typescript
+export type ServerlessFunctionConfig = {
+  handler: string;
+  runtime: string;
+  memory?: number;
+  maxDuration?: number;
+  environment?: Record<string, string>[];
+  regions?: string[];
+  supportsWrapper?: boolean;
+  supportsResponseStreaming?: boolean;
+  filePathMap?: VercelFilePathMap;
+};
+```
+
+### Route
+
+Routing rules:
+
+```typescript
+export type Route = Source | Handler;
+
+export type Source = {
+  src: string;
+  dest?: string;
+  headers?: Record<string, string>;
+  methods?: string[];
+  continue?: boolean;
+  caseSensitive?: boolean;
+  check?: boolean;
+  status?: number;
+  has?: Array<HostHasField | HeaderHasField | CookieHasField | QueryHasField>;
+  missing?: Array<HostHasField | HeaderHasField | CookieHasField | QueryHasField>;
+  locale?: Locale;
+  middlewareRawSrc?: string[];
+  middlewarePath?: string;
+};
+```
+
+## Integration with parseConfig
+
+The Vercel Build Output v3 parser is automatically invoked by `postProcessConfig`:
+
+```typescript
+// parse-config.ts
+export const postProcessConfig = Effect.fn('postProcessConfig')(function* (
+  config: NormalizedConfig,
+  projectFolder: string
+) {
+  const vercelParser = yield* VercelBuildOutputParser;
+  let result = yield* vercelParser.parse(config, projectFolder);
+  
+  // Additional post-processing...
+  
+  return result;
+});
+```
+
+This means you get Vercel Build Output v3 support automatically when using `parseConfig`:
+
+```typescript
+import { parseConfig } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+// If .vercel/output exists, it will be automatically merged
+const program = parseConfig('/path/to/gigadrive.yaml', '/path/to/project');
+
+const config = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+## Monorepo Support
+
+The Build Output v3 parser includes special handling for monorepos:
+
+1. **Root Detection**: Automatically finds the monorepo root via `determineRepoRoot`
+2. **File Whitelisting**: Uses `getMonorepoFiles` to include shared dependencies
+3. **Path Mapping**: Maintains correct file paths across workspace boundaries
+
+This ensures that functions in a monorepo package can access shared code from other packages:
+
+```typescript
+// Automatic monorepo detection result
+{
+  userArchive: {
+    rootOverwrite: '/path/to/monorepo',
+    fileWhitelist: [
+      '/path/to/monorepo/packages/app/*',
+      '/path/to/monorepo/shared/utils.js',
+    ]
+  }
+}
+```
+
+## Effect Context
+
+All Build Output v3 functions require:
+
+- `FileSystem.FileSystem` - File system operations
+- `Path.Path` - Path manipulation
+
+Provide via `NodeContext.layer`:
+
+```typescript
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = Effect.gen(function* () {
+  const parser = yield* VercelBuildOutputParser;
+  return yield* parser.parse(config, projectFolder);
+});
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```

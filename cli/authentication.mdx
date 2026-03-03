@@ -1,0 +1,220 @@
+---
+title: CLI Authentication
+description: Authenticate the Gigadrive CLI using OAuth and manage your session
+---
+
+The Gigadrive CLI uses OAuth 2.0 with PKCE (Proof Key for Code Exchange) to securely authenticate with your Gigadrive account. All credentials are stored locally in `~/.gigadrive/auth.json` with secure file permissions.
+
+## Login Flow
+
+<Steps>
+  <Step title="Start the login process">
+    Run the login command:
+
+    ```bash
+    gigadrive login
+    ```
+
+    The CLI will:
+    1. Start a local HTTP callback server on `127.0.0.1` with a random port
+    2. Generate a PKCE code challenge and state parameter for security
+    3. Open your default browser to the Gigadrive login page
+  </Step>
+
+  <Step title="Authorize in the browser">
+    In the browser window that opens:
+
+    1. Log in with your Gigadrive credentials (if not already logged in)
+    2. Review and authorize the CLI to access your account
+    3. You'll see a "Login Successful!" message
+    4. You can close the browser tab
+
+    <Note>
+    The OAuth flow uses the following scopes: `offline_access`, `openid`, `profile`, and `email`.
+    </Note>
+  </Step>
+
+  <Step title="CLI receives tokens">
+    After authorization, the CLI will:
+
+    1. Exchange the authorization code for access and refresh tokens
+    2. Store the tokens securely in `~/.gigadrive/auth.json` with `0600` permissions
+    3. Confirm successful login
+
+    ```bash
+    Login successful
+    ```
+  </Step>
+</Steps>
+
+## Authentication Architecture
+
+The CLI implements a robust authentication system with automatic token refresh:
+
+### Token Storage
+
+Authentication data is stored in `~/.gigadrive/auth.json` with the following structure:
+
+```json
+{
+  "refreshToken": "...",
+  "accessToken": "...",
+  "tokenExpirationTime": 1234567890
+}
+```
+
+<Warning>
+Never commit or share your `~/.gigadrive/auth.json` file. It contains sensitive credentials.
+</Warning>
+
+### Automatic Token Refresh
+
+The CLI automatically manages token lifecycle:
+
+1. **In-memory cache** — Access tokens are cached in memory during CLI execution
+2. **Expiration check** — Before each API request, the CLI checks if the token is expired
+3. **Auto-refresh** — If expired, the CLI uses the refresh token to obtain a new access token
+4. **Persistent storage** — New tokens are saved to `~/.gigadrive/auth.json`
+
+<Note>
+You don't need to manually refresh tokens — the CLI handles this automatically.
+</Note>
+
+### OAuth Configuration
+
+The CLI performs OIDC discovery at runtime by fetching:
+
+```
+https://idp.gigadrive.de/.well-known/openid-configuration
+```
+
+This discovers the following endpoints:
+- `authorization_endpoint` — Where users log in
+- `token_endpoint` — Where tokens are exchanged and refreshed
+- `userinfo_endpoint` — Where user profile information is retrieved
+
+## Check Authentication Status
+
+To verify you're logged in and see your user information:
+
+```bash
+gigadrive whoami
+```
+
+This command will:
+- Display your user profile information (name, email, username)
+- Confirm that authentication is working
+- Automatically refresh tokens if needed
+
+<CodeGroup>
+  ```bash Example Output
+  Logged in as: John Doe
+  Email: john@example.com
+  Username: johndoe
+  ```
+
+  ```bash Not Authenticated
+  Error: Not authenticated. Please run 'gigadrive login' first.
+  ```
+</CodeGroup>
+
+## Logout
+
+To log out and remove stored credentials:
+
+```bash
+gigadrive logout
+```
+
+This will:
+- Clear the in-memory token cache
+- Delete `~/.gigadrive/auth.json`
+- Require you to log in again before making API requests
+
+<Warning>
+Logging out does not revoke tokens on the server. If you need to revoke access, do so from your Gigadrive account settings.
+</Warning>
+
+## Security Features
+
+### PKCE (Proof Key for Code Exchange)
+
+The CLI uses PKCE to prevent authorization code interception attacks:
+
+1. **Code Verifier** — A cryptographically random string (64 bytes, base64url-encoded)
+2. **Code Challenge** — SHA-256 hash of the code verifier (base64url-encoded)
+3. **Challenge Method** — `S256` (SHA-256 hashing)
+
+The code challenge is sent during authorization, and the verifier is sent during token exchange, ensuring only the legitimate client can complete the flow.
+
+### State Parameter
+
+A random state parameter is generated for each login to prevent CSRF attacks. The CLI verifies that the state returned in the callback matches the original value.
+
+### Secure File Permissions
+
+The CLI ensures:
+- `~/.gigadrive/` directory has `0700` permissions (owner-only access)
+- `~/.gigadrive/auth.json` has `0600` permissions (owner read/write only)
+
+This prevents other users on the system from accessing your credentials.
+
+## Troubleshooting
+
+### Login fails with "Token exchange failed"
+
+This usually means:
+- The authorization code expired (they're short-lived)
+- Network connectivity issues
+
+**Solution:** Try logging in again. Ensure you complete the browser authorization promptly.
+
+### Token refresh fails
+
+If you see "Refresh token is invalid or expired":
+
+**Solution:** Run `gigadrive logout` followed by `gigadrive login` to re-authenticate.
+
+### Browser doesn't open automatically
+
+If the browser doesn't open, you'll see a URL in the terminal:
+
+```bash
+Please open this URL in your browser to log in:
+https://idp.gigadrive.de/oauth/authorize?...
+```
+
+**Solution:** Manually copy and paste the URL into your browser.
+
+### "Failed to fetch OIDC discovery document"
+
+This indicates:
+- Network connectivity issues
+- The identity provider is unreachable
+- Custom `GIGADRIVE_NETWORK_OAUTH_ISSUER_URL` is incorrect
+
+**Solution:** Check your internet connection and verify environment variables if using custom configuration.
+
+## Environment Variables
+
+For advanced use cases or custom deployments, you can override OAuth configuration:
+
+```bash
+export GIGADRIVE_NETWORK_OAUTH_ISSUER_URL=https://custom-idp.example.com
+export GIGADRIVE_NETWORK_OAUTH_CLIENT_ID=custom-client-id
+```
+
+<Warning>
+Only modify these variables if you're running a custom Gigadrive instance. Incorrect values will prevent authentication.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy an Application" icon="rocket" href="/quickstart">
+    Start deploying applications to Gigadrive Network
+  </Card>
+  <Card title="Project Configuration" icon="gear" href="/configuration">
+    Learn how to configure your project for deployment
+  </Card>
+</CardGroup>

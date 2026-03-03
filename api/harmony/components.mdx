@@ -1,0 +1,677 @@
+---
+title: Harmony Components
+description: Comprehensive reference for all UI components in the Harmony library
+---
+
+# Components
+
+Harmony provides a comprehensive collection of production-ready React components built on Radix UI primitives with Tailwind CSS styling.
+
+## Form Components
+
+### Button
+
+A flexible button component with multiple variants, sizes, and support for rendering as child elements.
+
+```tsx
+import { Button } from '@gigadrive/harmony';
+
+<Button variant="default" size="default">
+  Click me
+</Button>
+```
+
+#### Props
+
+<ParamField path="variant" type="string" default="default">
+  Visual style variant: `default` | `destructive` | `outline` | `secondary` | `ghost` | `link`
+</ParamField>
+
+<ParamField path="size" type="string" default="default">
+  Size variant: `default` | `sm` | `lg` | `icon`
+</ParamField>
+
+<ParamField path="wide" type="boolean" default={false}>
+  When `true`, button takes full width of container
+</ParamField>
+
+<ParamField path="asChild" type="boolean" default={false}>
+  When `true`, renders as Radix Slot (merges props with child element)
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes to apply
+</ParamField>
+
+#### Examples
+
+```tsx
+// Primary action button
+<Button variant="default">Save Changes</Button>
+
+// Destructive action
+<Button variant="destructive">Delete Account</Button>
+
+// Outlined button
+<Button variant="outline">Cancel</Button>
+
+// Icon button
+<Button variant="ghost" size="icon">
+  <IconSettings />
+</Button>
+
+// Full width button
+<Button wide>Continue</Button>
+
+// Render as link
+<Button asChild>
+  <a href="/dashboard">Go to Dashboard</a>
+</Button>
+```
+
+---
+
+### Input
+
+Text input component with floating labels, validation, and slot support for icons.
+
+```tsx
+import { Input } from '@gigadrive/harmony';
+
+<Input label="Email" type="email" placeholder="Enter your email" />
+```
+
+#### Props
+
+<ParamField path="label" type="string">
+  Floating label text
+</ParamField>
+
+<ParamField path="error" type="string">
+  Error message (also applies error styling)
+</ParamField>
+
+<ParamField path="helpText" type="string">
+  Help text displayed below input
+</ParamField>
+
+<ParamField path="leftElement" type="ReactNode">
+  Icon or element displayed on the left side
+</ParamField>
+
+<ParamField path="rightElement" type="ReactNode">
+  Icon or element displayed on the right side
+</ParamField>
+
+<ParamField path="bottomElement" type="ReactNode">
+  Custom element displayed below input
+</ParamField>
+
+<ParamField path="type" type="string" default="text">
+  HTML input type
+</ParamField>
+
+#### Examples
+
+```tsx
+// Basic input with label
+<Input label="Username" />
+
+// With error state
+<Input label="Email" error="Invalid email address" />
+
+// With help text
+<Input label="Password" type="password" helpText="Must be at least 8 characters" />
+
+// With icons
+<Input 
+  label="Search" 
+  leftElement={<IconSearch />} 
+  rightElement={<IconX />}
+/>
+```
+
+---
+
+### Select
+
+Dropdown select component built on Radix UI.
+
+```tsx
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@gigadrive/harmony';
+
+<Select>
+  <SelectTrigger>
+    <SelectValue placeholder="Select an option" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="option1">Option 1</SelectItem>
+    <SelectItem value="option2">Option 2</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+---
+
+### Checkbox
+
+Accessible checkbox component.
+
+```tsx
+import { Checkbox } from '@gigadrive/harmony';
+
+<Checkbox id="terms" />
+<label htmlFor="terms">Accept terms and conditions</label>
+```
+
+---
+
+### Switch
+
+Toggle switch component.
+
+```tsx
+import { Switch } from '@gigadrive/harmony';
+
+<Switch checked={enabled} onCheckedChange={setEnabled} />
+```
+
+---
+
+### Textarea
+
+Multi-line text input.
+
+```tsx
+import { Textarea } from '@gigadrive/harmony';
+
+<Textarea placeholder="Enter description" rows={4} />
+```
+
+## Layout Components
+
+### Card
+
+Container component with header, content, and footer sections.
+
+```tsx
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@gigadrive/harmony';
+
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+    <CardDescription>Card description goes here</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <p>Main content area</p>
+  </CardContent>
+  <CardFooter>
+    <Button>Action</Button>
+  </CardFooter>
+</Card>
+```
+
+#### Components
+
+- **Card** — Root container with border and shadow
+- **CardHeader** — Header section with padding
+- **CardTitle** — Title with appropriate typography
+- **CardDescription** — Muted description text
+- **CardContent** — Main content area
+- **CardFooter** — Footer section for actions
+- **CardToolbar** — Toolbar for additional controls
+- **CardTable** — Wrapper for tables within cards
+
+---
+
+### Container
+
+Centered page container with responsive max-width.
+
+```tsx
+import { Container } from '@gigadrive/harmony';
+
+<Container>
+  <h1>Page Content</h1>
+</Container>
+```
+
+---
+
+### Separator
+
+Visual divider between sections.
+
+```tsx
+import { Separator } from '@gigadrive/harmony';
+
+<Separator orientation="horizontal" />
+<Separator orientation="vertical" />
+```
+
+---
+
+### Tabs
+
+Tabbed interface component.
+
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@gigadrive/harmony';
+
+<Tabs defaultValue="tab1">
+  <TabsList>
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">Content 1</TabsContent>
+  <TabsContent value="tab2">Content 2</TabsContent>
+</Tabs>
+```
+
+## Data Display
+
+### DataTable
+
+Full-featured table with server-side sorting, pagination, column reordering, and visibility toggling.
+
+```tsx
+import { DataTable } from '@gigadrive/harmony';
+
+const columns = [
+  { id: 'name', header: 'Name', accessorKey: 'name', sortable: true },
+  { id: 'email', header: 'Email', accessorKey: 'email', sortable: true },
+  { id: 'role', header: 'Role', accessorKey: 'role' },
+];
+
+<DataTable 
+  columns={columns}
+  data={users}
+  enableColumnReordering
+  enableColumnVisibility
+  sorting={sorting}
+  onSortingChange={setSorting}
+  pagination={pagination}
+  onPaginationChange={setPagination}
+  totalRows={totalUsers}
+/>
+```
+
+#### Props
+
+<ParamField path="columns" type="DataTableColumn[]" required>
+  Column definitions
+</ParamField>
+
+<ParamField path="data" type="TData[]" required>
+  Row data
+</ParamField>
+
+<ParamField path="enableColumnReordering" type="boolean" default={false}>
+  Enable drag-and-drop column reordering
+</ParamField>
+
+<ParamField path="enableColumnVisibility" type="boolean" default={false}>
+  Enable column visibility toggling
+</ParamField>
+
+<ParamField path="sorting" type="SortingState | null">
+  Current sorting state `{ id: string, direction: 'asc' | 'desc' }`
+</ParamField>
+
+<ParamField path="onSortingChange" type="function">
+  Callback when sorting changes
+</ParamField>
+
+<ParamField path="pagination" type="PaginationState">
+  Current pagination state `{ pageIndex: number, pageSize: number }`
+</ParamField>
+
+<ParamField path="onPaginationChange" type="function">
+  Callback when pagination changes
+</ParamField>
+
+<ParamField path="totalRows" type="number">
+  Total rows for server-side pagination
+</ParamField>
+
+<ParamField path="isLoading" type="boolean" default={false}>
+  Display loading state
+</ParamField>
+
+<ParamField path="size" type="string" default="md">
+  Size variant: `sm` | `md` | `lg`
+</ParamField>
+
+<ParamField path="emptyState" type="ReactNode">
+  Custom empty state content
+</ParamField>
+
+<ParamField path="enablePageSizeSelector" type="boolean" default={false}>
+  Show page size dropdown
+</ParamField>
+
+<ParamField path="pageSizeOptions" type="number[]" default="[10, 20, 50, 100]">
+  Available page sizes
+</ParamField>
+
+See the [DataTable hook documentation](/api/harmony/hooks#usedatatable) for usage with `useDataTable`.
+
+---
+
+### Avatar
+
+User avatar with automatic fallback initials.
+
+```tsx
+import { Avatar, AvatarImage, AvatarFallback } from '@gigadrive/harmony';
+
+<Avatar>
+  <AvatarImage src="/avatar.jpg" alt="User" />
+  <AvatarFallback>John Doe</AvatarFallback>
+</Avatar>
+```
+
+<Note>
+`AvatarFallback` automatically computes initials from the provided string using the `getInitials` utility.
+</Note>
+
+---
+
+### Badge
+
+Status indicator or label with variant support.
+
+```tsx
+import { Badge } from '@gigadrive/harmony';
+
+<Badge variant="default">Active</Badge>
+<Badge variant="secondary">Pending</Badge>
+<Badge variant="destructive">Error</Badge>
+<Badge variant="outline">Draft</Badge>
+```
+
+#### Props
+
+<ParamField path="variant" type="string" default="default">
+  Visual variant: `default` | `secondary` | `destructive` | `outline`
+</ParamField>
+
+---
+
+### Alert
+
+Informational message component.
+
+```tsx
+import { Alert, AlertTitle, AlertDescription } from '@gigadrive/harmony';
+
+<Alert variant="default">
+  <IconInfo />
+  <AlertTitle>Note</AlertTitle>
+  <AlertDescription>This is an informational message.</AlertDescription>
+</Alert>
+```
+
+#### Props
+
+<ParamField path="variant" type="string" default="default">
+  Alert type: `default` | `destructive` | `success` | `warning` | `error` | `info`
+</ParamField>
+
+---
+
+### Skeleton
+
+Content placeholder for loading states.
+
+```tsx
+import { Skeleton } from '@gigadrive/harmony';
+
+<Skeleton className="h-4 w-full" />
+<Skeleton className="h-10 w-10 rounded-full" />
+```
+
+## Overlay Components
+
+### Dialog
+
+Modal dialog with overlay and customizable size.
+
+```tsx
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@gigadrive/harmony';
+
+<Dialog>
+  <DialogTrigger asChild>
+    <Button>Open Dialog</Button>
+  </DialogTrigger>
+  <DialogContent size="md">
+    <DialogHeader>
+      <DialogTitle>Dialog Title</DialogTitle>
+      <DialogDescription>Dialog description goes here</DialogDescription>
+    </DialogHeader>
+    <div>Content</div>
+    <DialogFooter>
+      <Button>Confirm</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+#### DialogContent Props
+
+<ParamField path="size" type="string" default="sm">
+  Dialog size: `sm` | `md` | `lg` | `full`
+</ParamField>
+
+<ParamField path="centerText" type="boolean" default={false}>
+  Center-align text content
+</ParamField>
+
+<ParamField path="loading" type="boolean" default={false}>
+  Show loading overlay
+</ParamField>
+
+---
+
+### Drawer
+
+Side panel overlay (mobile-friendly dialog alternative).
+
+```tsx
+import { Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle } from '@gigadrive/harmony';
+
+<Drawer>
+  <DrawerTrigger asChild>
+    <Button>Open Drawer</Button>
+  </DrawerTrigger>
+  <DrawerContent>
+    <DrawerHeader>
+      <DrawerTitle>Drawer Title</DrawerTitle>
+    </DrawerHeader>
+    <div>Content</div>
+  </DrawerContent>
+</Drawer>
+```
+
+---
+
+### Popover
+
+Floating content panel.
+
+```tsx
+import { Popover, PopoverTrigger, PopoverContent } from '@gigadrive/harmony';
+
+<Popover>
+  <PopoverTrigger asChild>
+    <Button>Open Popover</Button>
+  </PopoverTrigger>
+  <PopoverContent>
+    Popover content
+  </PopoverContent>
+</Popover>
+```
+
+---
+
+### Tooltip
+
+Contextual help text on hover.
+
+```tsx
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@gigadrive/harmony';
+
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger>Hover me</TooltipTrigger>
+    <TooltipContent>Helpful information</TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+---
+
+### DropdownMenu
+
+Contextual menu with keyboard navigation.
+
+```tsx
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@gigadrive/harmony';
+
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button>Options</Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuItem>Edit</DropdownMenuItem>
+    <DropdownMenuItem>Duplicate</DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>Delete</DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+```
+
+## Feedback Components
+
+### Toast
+
+Harmony uses [Sonner](https://sonner.emilkowal.ski/) for toast notifications.
+
+```tsx
+import { toast } from 'sonner';
+
+toast.success('Changes saved successfully');
+toast.error('Failed to save changes');
+toast.info('New update available');
+```
+
+---
+
+### LoadingPulse
+
+Animated loading indicator.
+
+```tsx
+import { LoadingPulse } from '@gigadrive/harmony';
+
+<LoadingPulse />
+```
+
+## Navigation Components
+
+### Breadcrumb
+
+Hierarchical navigation.
+
+```tsx
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator } from '@gigadrive/harmony';
+
+<Breadcrumb>
+  <BreadcrumbList>
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/">Home</BreadcrumbLink>
+    </BreadcrumbItem>
+    <BreadcrumbSeparator />
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/docs">Docs</BreadcrumbLink>
+    </BreadcrumbItem>
+  </BreadcrumbList>
+</Breadcrumb>
+```
+
+---
+
+### Pagination
+
+Page navigation controls.
+
+```tsx
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@gigadrive/harmony';
+
+<Pagination>
+  <PaginationContent>
+    <PaginationItem>
+      <PaginationPrevious href="?page=1" />
+    </PaginationItem>
+    <PaginationItem>
+      <PaginationLink href="?page=1">1</PaginationLink>
+    </PaginationItem>
+    <PaginationItem>
+      <PaginationNext href="?page=3" />
+    </PaginationItem>
+  </PaginationContent>
+</Pagination>
+```
+
+## Component Composition Patterns
+
+### Using `asChild`
+
+Many components support the `asChild` prop from Radix UI's Slot component:
+
+```tsx
+// Button renders as a link
+<Button asChild>
+  <a href="/dashboard">Dashboard</a>
+</Button>
+
+// Works with Next.js Link
+<Button asChild>
+  <Link href="/profile">Profile</Link>
+</Button>
+```
+
+### Combining Components
+
+```tsx
+<Card>
+  <CardHeader>
+    <div className="flex items-center justify-between">
+      <CardTitle>Users</CardTitle>
+      <Button size="sm">Add User</Button>
+    </div>
+  </CardHeader>
+  <CardContent>
+    <DataTable columns={columns} data={users} />
+  </CardContent>
+</Card>
+```
+
+## Styling Components
+
+All components accept a `className` prop that's merged with default styles using the `cn()` utility:
+
+```tsx
+<Button className="mt-4 w-full">Submit</Button>
+<Card className="border-2 border-primary">...</Card>
+```
+
+<Note>
+Use Tailwind utility classes to customize components. The `cn()` utility uses `tailwind-merge` to intelligently merge conflicting classes.
+</Note>
+
+## Next Steps
+
+<Card title="Hooks" icon="hook" href="/api/harmony/hooks">
+  Learn about React hooks for state management and common patterns
+</Card>

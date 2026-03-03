@@ -1,0 +1,236 @@
+---
+title: Installation
+description: Install the Gigadrive SDK packages you need for your project using npm, yarn, pnpm, or bun.
+---
+
+# Installation
+
+The Gigadrive SDK is distributed as a collection of npm packages. Install only the packages you need for your project.
+
+## Prerequisites
+
+<Note>
+  - **Node.js**: v18 or higher (v20+ required for CLI)
+  - **Package Manager**: npm, yarn, pnpm, or bun
+</Note>
+
+## Core SDK
+
+The main SDK package provides core functionality for interacting with Gigadrive Network services.
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/sdk
+```
+
+```bash yarn
+yarn add @gigadrive/sdk
+```
+
+```bash pnpm
+pnpm add @gigadrive/sdk
+```
+
+```bash bun
+bun add @gigadrive/sdk
+```
+</CodeGroup>
+
+**Current Version:** `0.1.2`
+
+## Common Utilities
+
+Shared utilities for encryption, hashing, formatting, and data manipulation.
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/commons
+```
+
+```bash yarn
+yarn add @gigadrive/commons
+```
+
+```bash pnpm
+pnpm add @gigadrive/commons
+```
+
+```bash bun
+bun add @gigadrive/commons
+```
+</CodeGroup>
+
+**Current Version:** `2.1.1`
+
+**Includes:**
+- `deepMerge` - Deep merge objects with array concatenation
+- `formatFileSize` - Convert bytes to human-readable sizes
+- `encrypt` / `decrypt` - AES-GCM encryption utilities
+- `sha256` - SHA-256 hashing
+- `sleep` - Promise-based sleep utility
+- URL utilities and more
+
+## Network Config
+
+Configuration parsing and validation for Gigadrive Network deployments.
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/network-config
+```
+
+```bash yarn
+yarn add @gigadrive/network-config
+```
+
+```bash pnpm
+pnpm add @gigadrive/network-config
+```
+
+```bash bun
+bun add @gigadrive/network-config
+```
+</CodeGroup>
+
+**Current Version:** `3.0.1`
+
+**Features:**
+- YAML/JSON config parsing
+- JSON Schema validation
+- Framework auto-detection (Next.js, React, Vue, etc.)
+- Vercel Build Output v3 compatibility
+- Region and runtime mapping
+
+<Tip>
+  This package uses Effect-TS and requires `@effect/platform` as a peer dependency. Install it alongside:
+  
+  ```bash
+  npm install @gigadrive/network-config effect @effect/platform
+  ```
+</Tip>
+
+## CLI Tool
+
+Command-line interface for building, deploying, and managing applications.
+
+<CodeGroup>
+```bash npm
+npm install -g gigadrive
+```
+
+```bash yarn
+yarn global add gigadrive
+```
+
+```bash pnpm
+pnpm add -g gigadrive
+```
+
+```bash bun
+bun add -g gigadrive
+```
+</CodeGroup>
+
+**Current Version:** `2.1.1`
+
+**Aliases:** `gigadrive` or `gn`
+
+**Requirements:** Node.js v20 or higher
+
+Verify the installation:
+
+```bash
+gigadrive --version
+# or
+gn --version
+```
+
+## UI Components (Optional)
+
+React component library built on Radix UI and Tailwind CSS.
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/harmony
+```
+
+```bash yarn
+yarn add @gigadrive/harmony
+```
+
+```bash pnpm
+pnpm add @gigadrive/harmony
+```
+
+```bash bun
+bun add @gigadrive/harmony
+```
+</CodeGroup>
+
+**Current Version:** `3.6.2`
+
+**Peer Dependencies:**
+```bash
+npm install react@^18.0.0 react-dom@^18.0.0
+```
+
+**Importing Styles:**
+
+```tsx
+import '@gigadrive/harmony/style.css';
+```
+
+## Build Utilities (Optional)
+
+Build-time utilities for file operations, downloads, and glob patterns.
+
+<CodeGroup>
+```bash npm
+npm install @gigadrive/build-utils
+```
+
+```bash yarn
+yarn add @gigadrive/build-utils
+```
+
+```bash pnpm
+pnpm add @gigadrive/build-utils
+```
+
+```bash bun
+bun add @gigadrive/build-utils
+```
+</CodeGroup>
+
+**Current Version:** `1.0.1`
+
+**Requirements:** Node.js v18 or higher
+
+## Verify Installation
+
+Create a simple test file to verify your installation:
+
+```typescript test.ts
+import { formatFileSize } from '@gigadrive/commons';
+
+console.log(formatFileSize(1234567890)); // Output: 1.15 GB
+```
+
+Run it with:
+
+```bash
+node --loader ts-node/esm test.ts
+```
+
+## Next Steps
+
+Now that you've installed the SDK, check out the [Quick Start guide](/quickstart) to start building with Gigadrive.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn the basics with a hands-on tutorial
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli-reference">
+    Explore CLI commands and options
+  </Card>
+</CardGroup>

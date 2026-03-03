@@ -1,0 +1,112 @@
+---
+title: CLI Installation
+description: Install and configure the Gigadrive CLI to deploy applications from your terminal
+---
+
+The Gigadrive CLI (`gigadrive` or `gn`) enables you to deploy, manage, and debug applications on the Gigadrive Network directly from your terminal.
+
+## Prerequisites
+
+Before installing the CLI, ensure you have:
+
+- **Node.js v20.0.0 or higher** — The CLI requires a modern Node.js runtime
+- **npm, yarn, pnpm, or bun** — Any modern package manager will work
+
+<Note>
+The CLI is built with Effect-TS and provides full type safety for all operations.
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install via npm">
+    Install the CLI globally using your preferred package manager:
+
+    <CodeGroup>
+      ```bash npm
+      npm install -g gigadrive
+      ```
+
+      ```bash pnpm
+      pnpm add -g gigadrive
+      ```
+
+      ```bash yarn
+      yarn global add gigadrive
+      ```
+
+      ```bash bun
+      bun add -g gigadrive
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify installation">
+    Confirm the CLI is installed correctly:
+
+    ```bash
+    gigadrive --version
+    ```
+
+    You can also use the short alias:
+
+    ```bash
+    gn --version
+    ```
+
+    <Note>
+    Both `gigadrive` and `gn` commands are equivalent — use whichever you prefer.
+    </Note>
+  </Step>
+
+  <Step title="Log in to your account">
+    Authenticate with your Gigadrive account:
+
+    ```bash
+    gigadrive login
+    ```
+
+    This will open your browser to complete the OAuth flow. See [Authentication](/cli/authentication) for details.
+  </Step>
+</Steps>
+
+## Available Commands
+
+Once installed, the CLI provides the following commands:
+
+| Command | Description |
+| ------- | ----------- |
+| `gigadrive login` | Authenticate with your Gigadrive account |
+| `gigadrive whoami` | Display information about the authenticated user |
+| `gigadrive platform deploy` | Deploy your application to Gigadrive Network |
+| `gigadrive build` | Create a deployment archive locally |
+| `gigadrive debug config` | View the resolved project configuration |
+
+<Tip>
+Run `gigadrive --help` to see all available commands and options.
+</Tip>
+
+## Environment Variables
+
+The CLI can be configured using the following environment variables:
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `GIGADRIVE_NETWORK_OAUTH_ISSUER_URL` | `https://idp.gigadrive.de` | OIDC issuer URL for authentication |
+| `GIGADRIVE_NETWORK_OAUTH_CLIENT_ID` | `todo_add_client_id` | OAuth client ID for CLI authentication |
+| `GIGADRIVE_API_BASE_URL` | `http://localhost:3000` | Deployment API base URL |
+
+<Warning>
+These environment variables are typically not needed for normal usage. Only configure them if you're developing against a custom Gigadrive instance.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/authentication">
+    Learn how to authenticate and manage your session
+  </Card>
+  <Card title="Deploy an Application" icon="rocket" href="/quickstart">
+    Deploy your first application to Gigadrive Network
+  </Card>
+</CardGroup>

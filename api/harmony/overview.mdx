@@ -1,0 +1,218 @@
+---
+title: Harmony Overview
+description: A React UI component library built on Radix UI primitives, Tailwind CSS, and shadcn/ui patterns for the Gigadrive SDK
+---
+
+# Harmony UI Library
+
+`@gigadrive/harmony` is Gigadrive's production-ready React UI component library, providing a comprehensive suite of accessible, customizable components built on industry-leading foundations.
+
+## Architecture
+
+Harmony is built on three core technologies:
+
+- **Radix UI** — Unstyled, accessible primitives that handle complex interaction patterns
+- **Tailwind CSS** — Utility-first CSS framework with custom theme variables
+- **class-variance-authority (CVA)** — Type-safe variant handling for component styling
+
+This architecture follows the **shadcn/ui** pattern, providing components that are both highly functional and fully customizable.
+
+## Installation
+
+Install the library and its peer dependencies:
+
+```bash
+npm install @gigadrive/harmony react react-dom
+```
+
+<Note>
+Harmony requires React 18.0.0 or higher.
+</Note>
+
+## CSS Setup
+
+Import the required styles in your application entry point:
+
+```tsx
+import '@gigadrive/harmony/style.css';
+```
+
+Optional CSS imports:
+
+```tsx
+// Theme variables only
+import '@gigadrive/harmony/theme.css';
+
+// Custom font (Resist Sans Text)
+import '@gigadrive/harmony/font.css';
+```
+
+## Basic Usage
+
+```tsx
+import { Button, Card, CardHeader, CardTitle, CardContent } from '@gigadrive/harmony';
+
+function App() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Welcome to Harmony</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Button variant="default">Get Started</Button>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## Tree-shakable Imports
+
+For optimal bundle size, import individual components via subpath exports:
+
+```tsx
+// Tree-shakable (recommended)
+import { Button } from '@gigadrive/harmony/button';
+import { Input } from '@gigadrive/harmony/input';
+
+// Barrel import (loads entire library)
+import { Button, Input } from '@gigadrive/harmony';
+```
+
+<Tip>
+If you're using Next.js, add `optimizePackageImports: ['@gigadrive/harmony']` to your `next.config.js` to automatically optimize barrel imports.
+</Tip>
+
+## Component Categories
+
+Harmony provides components across several categories:
+
+### Form Controls
+- **Input** — Text input with label, error, and helper text support
+- **Button** — Flexible button with multiple variants and sizes
+- **Checkbox** — Accessible checkbox component
+- **Select** — Dropdown select component
+- **Switch** — Toggle switch component
+- **Textarea** — Multi-line text input
+
+### Layout & Structure
+- **Card** — Container with header, content, and footer sections
+- **Container** — Centered page container with max-width
+- **Separator** — Visual divider between content
+- **Tabs** — Tabbed interface component
+
+### Data Display
+- **DataTable** — Full-featured table with sorting, pagination, and filtering
+- **Avatar** — User avatar with image and fallback
+- **Badge** — Status indicator or label
+- **Alert** — Informational message with variants
+
+### Navigation
+- **Navbar** — Application navigation bar
+- **Breadcrumb** — Hierarchical navigation
+- **Pagination** — Page navigation controls
+- **Sidebar** — Application sidebar navigation
+
+### Overlays & Modals
+- **Dialog** — Modal dialog with overlay
+- **Drawer** — Side panel overlay
+- **Popover** — Floating content panel
+- **Tooltip** — Contextual help text
+- **DropdownMenu** — Contextual menu
+
+### Feedback
+- **Toast** — Temporary notification (via Sonner)
+- **LoadingPulse** — Loading indicator
+- **Skeleton** — Content placeholder
+
+## Theming
+
+Harmony uses CSS custom properties for theming:
+
+```css
+:root {
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --border: 214.3 31.8% 91.4%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+```
+
+<Note>
+Colors are defined in HSL format without the `hsl()` wrapper. The `cn()` utility applies them as `hsl(var(--primary))`.
+</Note>
+
+## Dark Mode
+
+Harmony uses Tailwind's `class` strategy for dark mode. Use `next-themes` or a similar solution:
+
+```tsx
+import { ThemeProvider } from 'next-themes';
+
+function App({ children }) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system">
+      {children}
+    </ThemeProvider>
+  );
+}
+```
+
+## Accessibility
+
+All components are built with accessibility in mind:
+
+- **Keyboard navigation** — Full keyboard support for all interactive components
+- **Screen reader support** — Proper ARIA labels and roles
+- **Focus management** — Visible focus indicators and logical tab order
+- **Color contrast** — WCAG AA compliant color combinations
+
+## TypeScript Support
+
+Harmony is written in TypeScript and exports full type definitions:
+
+```tsx
+import type { ButtonProps } from '@gigadrive/harmony';
+
+const props: ButtonProps = {
+  variant: 'default',
+  size: 'lg',
+  onClick: () => console.log('clicked'),
+};
+```
+
+## Performance Best Practices
+
+<Tip>
+**For Application Developers:**
+
+- Use subpath imports or Next.js `optimizePackageImports`
+- Lazy-load heavy components (DataTable, Dialog) with `React.lazy` or `next/dynamic`
+- Preload on user intent (hover/focus) to reduce perceived latency
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="grid" href="/api/harmony/components">
+    Explore all available UI components
+  </Card>
+  <Card title="Hooks" icon="hook" href="/api/harmony/hooks">
+    Learn about React hooks for common patterns
+  </Card>
+  <Card title="Utilities" icon="wrench" href="/api/harmony/utilities">
+    Discover utility functions and helpers
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/Gigadrive/sdk/tree/main/packages/harmony">
+    View source code and examples
+  </Card>
+</CardGroup>

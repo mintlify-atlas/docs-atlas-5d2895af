@@ -1,0 +1,532 @@
+---
+title: Deployment Workflow
+description: End-to-end deployment pipeline from CLI command to live application
+---
+
+The Gigadrive deployment workflow orchestrates the entire process of deploying your application from local development to production. This guide walks through each stage of the pipeline, from configuration parsing to live traffic routing.
+
+## Overview
+
+A deployment flows through **seven key stages**:
+
+<Steps>
+  <Step title="Configuration Resolution">
+    Parse and validate `gigadrive.yaml` or auto-detect framework
+  </Step>
+  <Step title="Deployment Creation">
+    Create a deployment record via API
+  </Step>
+  <Step title="Archive Creation">
+    Zip project files with ignore rules
+  </Step>
+  <Step title="Multipart Upload">
+    Upload archive in parallel chunks to object storage
+  </Step>
+  <Step title="Build Pipeline">
+    Build application in isolated container environment
+  </Step>
+  <Step title="Output Processing">
+    Transform build output to Vercel Build Output v3 format
+  </Step>
+  <Step title="Activation">
+    Route traffic to the new deployment
+  </Step>
+</Steps>
+
+## Command Invocation
+
+Deployments start with the `gigadrive platform deploy` command:
+
+```bash
+gigadrive platform deploy
+```
+
+This triggers the Effect-TS deployment pipeline:
+
+```typescript packages/cli/src/commands/platform/deploy/index.ts
+export const deployCommand = Command.make('deploy', {}, () =>
+  Effect.gen(function* () {
+    const projectConfig = yield* ProjectConfigService;
+    const deploymentApi = yield* DeploymentApiService;
+    const archiveService = yield* ArchiveService;
+
+    const cwd = process.cwd();
+
+    // 1. Configuration Resolution
+    yield* Console.log('Resolving configuration...');
+    const { config } = yield* projectConfig.resolve(cwd);
+
+    // 2. Deployment Creation
+    yield* Console.log('Creating deployment...');
+    const deploymentId = yield* deploymentApi.createDeployment('app-id');
+    yield* Console.log(`Deployment ID: ${deploymentId}`);
+
+    // 3. Archive Creation & Upload
+    yield* Console.log('Creating archive...');
+    const archivePath = yield* createArchive(config, cwd);
+    
+    yield* Console.log('Uploading archive...');
+    yield* uploadArchive(deploymentId, archivePath);
+
+    // 4. Poll for completion
+    yield* pollDeployment(deploymentId);
+  })
+);
+```
+
+## Stage 1: Configuration Resolution
+
+### Auto-Detection
+
+If no `gigadrive.yaml` exists, the CLI **auto-detects** your framework:
+
+```typescript packages/network-config/src/detection/
+// Framework detection checks:
+1. Read package.json dependencies
+2. Match against known frameworks (Next.js, Nuxt, Remix, etc.)
+3. Apply framework-specific defaults
+4. Return normalized config
+```
+
+<Info>
+Framework detection uses **Effect-TS** with `FileSystem.FileSystem` from `@effect/platform` for type-safe file I/O.
+</Info>
+
+### Manual Configuration
+
+For custom setups, create a `gigadrive.yaml`:
+
+```yaml gigadrive.yaml
+version: 4
+name: my-app
+region: eu-central-1
+
+build:
+  command: npm run build
+  output: .next
+
+runtime: nodejs20
+
+routes:
+  - src: /api/.*
+    dest: /api/index.js
+  - src: /(.*)
+    dest: /$1
+```
+
+### Validation
+
+Configuration is validated against **JSON Schema v4**:
+
+```typescript packages/network-config/src/parse-config.ts
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import schema from './v4/schema.json';
+
+const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);
+
+const validate = ajv.compile(schema);
+if (!validate(config)) {
+  throw new ConfigValidationError({
+    message: 'Invalid configuration',
+    errors: validate.errors
+  });
+}
+```
+
+<Accordion title="Configuration Properties">
+  - **name:** Application name
+  - **region:** Deployment region (`eu-central-1`, `us-east-1`, etc.)
+  - **runtime:** Runtime environment (`nodejs20`, `nodejs18`, `python3.11`, etc.)
+  - **build:** Build command and output directory
+  - **routes:** URL routing rules
+  - **env:** Environment variables
+  - **excludeFiles:** Files to exclude from upload
+</Accordion>
+
+## Stage 2: Deployment Creation
+
+The CLI calls the Deployment API to create a deployment record:
+
+```typescript packages/cli/src/services/deployment-api.ts
+const createDeployment = Effect.fn('DeploymentApiService.createDeployment')(
+  function* (applicationId: string) {
+    const token = yield* auth.getAccessToken;
+    const apiBaseUrl = yield* ApiBaseUrl;
+
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(`${apiBaseUrl}/deployments`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ applicationId })
+        }),
+      catch: (err) => new DeploymentCreateError({ message: String(err) })
+    });
+
+    const data = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<{ id: string }>,
+      catch: () => new DeploymentCreateError({ message: 'Invalid response' })
+    });
+
+    return data.id as DeploymentId;
+  }
+);
+```
+
+<Info>
+The deployment ID is a **branded type** (`DeploymentId`) to prevent mixing it with other string IDs.
+</Info>
+
+## Stage 3: Archive Creation
+
+The CLI creates a **zip archive** of your project:
+
+```typescript packages/cli/src/services/archive.ts
+const createZipArchive = Effect.fn('ArchiveService.createZipArchive')(
+  function* (sourceDir: string, outputPath: string, options: ArchiveOptions) {
+    // Create ignore filter
+    const ig = ignore();
+    if (options.excludeFiles) {
+      ig.add(options.excludeFiles);
+    }
+    if (options.useManagedIgnore) {
+      ig.add(['.git', 'node_modules', '.env']);
+    }
+
+    // Create archive stream
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const output = fs.createWriteStream(outputPath);
+
+    archive.pipe(output);
+
+    // Add files (respecting ignore rules)
+    if (options.whitelist) {
+      // Only include whitelisted files
+      for (const file of options.whitelist) {
+        archive.file(path.join(sourceDir, file), { name: file });
+      }
+    } else {
+      // Include all non-ignored files
+      archive.glob('**/*', {
+        cwd: sourceDir,
+        dot: true,
+        ignore: (name) => ig.ignores(name)
+      });
+    }
+
+    yield* Effect.promise(() => archive.finalize());
+    yield* Effect.promise(() => new Promise((resolve) => output.on('close', resolve)));
+
+    const stats = yield* Effect.tryPromise({
+      try: () => fs.promises.stat(outputPath),
+      catch: (err) => new ArchiveCreateError({ message: String(err) })
+    });
+
+    return { path: outputPath, size: stats.size };
+  }
+);
+```
+
+### Ignore Rules
+
+Archives respect multiple ignore sources:
+
+<CardGroup cols={3}>
+  <Card title=".gitignore" icon="git">
+    Standard Git ignore patterns
+  </Card>
+  <Card title="excludeFiles" icon="file-excel">
+    Custom patterns in `gigadrive.yaml`
+  </Card>
+  <Card title="Managed Rules" icon="shield">
+    Always exclude: `.git`, `node_modules`, `.env`
+  </Card>
+</CardGroup>
+
+## Stage 4: Multipart Upload
+
+Large archives are uploaded in **parallel chunks** (10 MB each):
+
+```typescript packages/cli/src/commands/platform/deploy/index.ts
+const uploadArchive = (deploymentId: DeploymentId, archivePath: string, fileSize: number) =>
+  Effect.gen(function* () {
+    const deploymentApi = yield* DeploymentApiService;
+    const fs = yield* FileSystem.FileSystem;
+
+    // 1. Start multipart upload
+    const uploadId = yield* deploymentApi.startMultipartUpload(deploymentId);
+
+    const FILE_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB
+    const numChunks = Math.ceil(fileSize / FILE_CHUNK_SIZE);
+
+    yield* Effect.log('Starting multipart upload', { uploadId, numChunks, fileSize });
+
+    // 2. Upload chunks in parallel (concurrency: 3)
+    const parts = yield* Effect.all(
+      Array.from({ length: numChunks }, (_, i) => {
+        const partNumber = i + 1;
+        const start = i * FILE_CHUNK_SIZE;
+        const bytesToRead = partNumber < numChunks ? FILE_CHUNK_SIZE : fileSize - start;
+
+        return Effect.gen(function* () {
+          // Get presigned URL for this part
+          const presignedUrl = yield* deploymentApi.getPresignedUrl(
+            deploymentId,
+            uploadId,
+            partNumber
+          );
+
+          // Stream chunk from disk
+          const chunkData = yield* Stream.runCollect(
+            fs.stream(archivePath, { offset: start, bytesToRead })
+          ).pipe(
+            Effect.map((chunks) => Buffer.concat(Array.from(chunks)))
+          );
+
+          yield* Effect.log(`Uploading part ${partNumber}/${numChunks}`, {
+            size: chunkData.length
+          });
+
+          // Upload to presigned URL
+          return yield* deploymentApi.uploadPart(presignedUrl, chunkData, partNumber);
+        });
+      }),
+      { concurrency: 3 }
+    );
+
+    // 3. Complete upload
+    yield* deploymentApi.completeUpload(deploymentId, uploadId, parts);
+  });
+```
+
+<Note>
+**Why multipart upload?**
+- ✅ Handles large files (> 5 GB)
+- ✅ Parallel uploads = faster
+- ✅ Resumable on network errors
+- ✅ Memory-efficient (streams chunks from disk)
+</Note>
+
+## Stage 5: Build Pipeline
+
+Once uploaded, the server:
+
+<Steps>
+  <Step title="Extract Archive">
+    Unzip the archive into an isolated build container
+  </Step>
+  <Step title="Detect Package Manager">
+    Check for `pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`, or default to `npm`
+  </Step>
+  <Step title="Install Dependencies">
+    Run `pnpm install` (or equivalent)
+  </Step>
+  <Step title="Run Build Command">
+    Execute `build.command` from config (e.g., `npm run build`)
+  </Step>
+  <Step title="Validate Output">
+    Ensure `build.output` directory exists
+  </Step>
+</Steps>
+
+### Build Logs
+
+The CLI **streams build logs** in real-time:
+
+```typescript packages/cli/src/commands/platform/deploy/index.ts
+const pollDeployment = (deploymentId: DeploymentId) =>
+  Effect.gen(function* () {
+    const deploymentApi = yield* DeploymentApiService;
+    let lastStatus: DeploymentStatus = 'PENDING';
+    let logOffset = 0;
+
+    yield* Console.log('Status: Pending');
+
+    yield* Effect.repeat(
+      Effect.gen(function* () {
+        // Check status
+        const newStatus = yield* deploymentApi.getDeploymentStatus(deploymentId);
+        if (newStatus !== lastStatus) {
+          lastStatus = newStatus;
+          yield* Console.log(`Status: ${newStatus}`);
+        }
+
+        // Fetch logs
+        const logsPage = yield* deploymentApi.getLogs(deploymentId, {
+          offset: logOffset,
+          limit: 100
+        });
+
+        for (const logEntry of logsPage.items) {
+          logOffset++;
+          yield* printLog(logEntry);
+        }
+
+        // Check terminal states
+        if (newStatus === 'ACTIVE') {
+          yield* Console.log(`Deployed to https://${deploymentId}.gigadrivedev.com`);
+          return yield* Effect.fail('done' as const);
+        }
+
+        if (newStatus === 'FAILED') {
+          return yield* Effect.fail(
+            new DeploymentFailedError({
+              message: 'Deployment failed. Check logs for details.'
+            })
+          );
+        }
+      }),
+      Schedule.addDelay(Schedule.forever, () => Duration.seconds(1))
+    );
+  });
+```
+
+## Stage 6: Output Processing
+
+Build output is transformed to **Vercel Build Output v3** format:
+
+```typescript packages/network-config/src/build-output-v3/parse.ts
+// Expected structure:
+.vercel/
+  output/
+    config.json        # Routes, runtime config
+    functions/         # Serverless functions
+      api/
+        index.func/    # Function bundle
+    static/            # Static assets
+      _next/
+      favicon.ico
+```
+
+<Info>
+Vercel Build Output v3 is a **standard format** for serverless applications, ensuring compatibility across platforms.
+</Info>
+
+### Route Processing
+
+Routes from `config.json` are mapped to Gigadrive's routing engine:
+
+```json .vercel/output/config.json
+{
+  "version": 3,
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
+```
+
+## Stage 7: Activation
+
+Once the build succeeds:
+
+<Steps>
+  <Step title="Deploy to Edge">
+    Push build output to edge nodes in the target region
+  </Step>
+  <Step title="Update DNS">
+    Point `<deploymentId>.gigadrivedev.com` to the new deployment
+  </Step>
+  <Step title="Mark Active">
+    Set deployment status to `ACTIVE`
+  </Step>
+  <Step title="Notify CLI">
+    CLI displays the live URL
+  </Step>
+</Steps>
+
+```bash
+✓ Deployment complete!
+✓ Deployed to https://abc123.gigadrivedev.com
+```
+
+## Deployment States
+
+A deployment progresses through these states:
+
+<Steps>
+  <Step title="PENDING">
+    Deployment created, waiting for upload
+  </Step>
+  <Step title="UPLOADING">
+    Archive upload in progress
+  </Step>
+  <Step title="BUILDING">
+    Build pipeline running
+  </Step>
+  <Step title="DEPLOYING">
+    Pushing to edge nodes
+  </Step>
+  <Step title="ACTIVE">
+    Live and serving traffic ✅
+  </Step>
+  <Step title="FAILED">
+    Build or deployment failed ❌
+  </Step>
+</Steps>
+
+## Error Handling
+
+The CLI handles errors at every stage with **typed Effect errors**:
+
+```typescript
+Effect.catchTags({
+  ConfigNotFoundError: (err) =>
+    Console.error(`Config not found: ${err.message}`),
+  
+  DeploymentCreateError: (err) =>
+    Console.error(`Failed to create deployment: ${err.message}`),
+  
+  ArchiveCreateError: (err) =>
+    Console.error(`Failed to create archive: ${err.message}`),
+  
+  UploadPartError: (err) =>
+    Console.error(`Upload failed at part ${err.partNumber}: ${err.message}`),
+  
+  DeploymentFailedError: (err) =>
+    Console.error(`Deployment failed: ${err.message}`)
+});
+```
+
+<Tip>
+Every error includes **context** (e.g., part number, file path) to help diagnose issues.
+</Tip>
+
+## Performance Optimizations
+
+<CardGroup cols={2}>
+  <Card title="Parallel Uploads" icon="arrows-split-up-and-left">
+    3 chunks upload simultaneously
+  </Card>
+  <Card title="Streaming I/O" icon="water">
+    Chunks stream from disk (memory-bounded)
+  </Card>
+  <Card title="Compression" icon="file-zipper">
+    Max zlib compression (level 9)
+  </Card>
+  <Card title="Smart Ignores" icon="filter">
+    Exclude unnecessary files (node_modules, .git)
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Structure" icon="sitemap" href="/concepts/monorepo-structure">
+    Learn about the SDK's monorepo organization
+  </Card>
+  <Card title="Effect-TS Architecture" icon="layer-group" href="/concepts/effect-ts">
+    Deep dive into Effect-TS patterns used in the CLI
+  </Card>
+</CardGroup>

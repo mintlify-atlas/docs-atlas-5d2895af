@@ -1,0 +1,234 @@
+---
+title: Environment Variables
+description: Configure the Gigadrive CLI behavior using environment variables
+---
+
+The Gigadrive CLI reads configuration from environment variables using Effect's `Config` system. All environment variables are validated and type-checked at runtime.
+
+## Available Environment Variables
+
+The CLI uses the following environment variables for configuration:
+
+### OAuth & Authentication
+
+<ParamField path="GIGADRIVE_NETWORK_OAUTH_ISSUER_URL" type="string" default="https://idp.gigadrive.de">
+  The OIDC issuer URL for authentication.
+  
+  The CLI performs OIDC discovery by fetching `{ISSUER_URL}/.well-known/openid-configuration` to retrieve:
+  - Authorization endpoint
+  - Token endpoint
+  - Userinfo endpoint
+  
+  **Example:**
+  ```bash
+  export GIGADRIVE_NETWORK_OAUTH_ISSUER_URL=https://custom-idp.example.com
+  ```
+</ParamField>
+
+<ParamField path="GIGADRIVE_NETWORK_OAUTH_CLIENT_ID" type="string" default="todo_add_client_id">
+  The OAuth 2.0 client ID for the CLI application.
+  
+  This is used during the OAuth authorization code flow when running `gigadrive login`.
+  
+  **Example:**
+  ```bash
+  export GIGADRIVE_NETWORK_OAUTH_CLIENT_ID=cli_app_12345
+  ```
+</ParamField>
+
+### Deployment API
+
+<ParamField path="GIGADRIVE_API_BASE_URL" type="string" default="http://localhost:3000">
+  The base URL for the Gigadrive deployment API.
+  
+  All deployment operations (create deployment, upload artifacts, check status, fetch logs) use this URL.
+  
+  **Example:**
+  ```bash
+  export GIGADRIVE_API_BASE_URL=https://api.gigadrive.network
+  ```
+</ParamField>
+
+## How Environment Variables Work
+
+The CLI uses Effect's `Config` system instead of directly accessing `process.env`. This provides several benefits:
+
+### Type Safety
+
+All environment variables are validated and typed:
+
+```typescript
+const OAuthEnvConfig = Config.all({
+  issuerUrl: Config.string('GIGADRIVE_NETWORK_OAUTH_ISSUER_URL')
+    .pipe(Config.withDefault('https://idp.gigadrive.de')),
+  clientId: Config.string('GIGADRIVE_NETWORK_OAUTH_CLIENT_ID')
+    .pipe(Config.withDefault('todo_add_client_id')),
+});
+```
+
+### Default Values
+
+Every environment variable has a sensible default, so the CLI works out of the box without configuration.
+
+### Runtime Validation
+
+Environment variables are validated when the service is initialized, not when they're used, providing early error detection.
+
+## Setting Environment Variables
+
+### Temporary (Current Session)
+
+```bash
+export GIGADRIVE_API_BASE_URL=https://api.gigadrive.network
+gigadrive platform deploy
+```
+
+### Persistent (Shell Profile)
+
+Add to your `~/.bashrc`, `~/.zshrc`, or equivalent:
+
+```bash ~/.zshrc
+export GIGADRIVE_NETWORK_OAUTH_ISSUER_URL=https://idp.gigadrive.de
+export GIGADRIVE_NETWORK_OAUTH_CLIENT_ID=cli_app_12345
+export GIGADRIVE_API_BASE_URL=https://api.gigadrive.network
+```
+
+### Per-Command
+
+```bash
+GIGADRIVE_API_BASE_URL=https://api.staging.gigadrive.network gigadrive platform deploy
+```
+
+## Environment Variable Precedence
+
+Environment variables are resolved in this order:
+
+1. **Command-line environment** — Variables set in the same command
+2. **Shell environment** — Exported variables in your current shell
+3. **Shell profile** — Variables loaded from `.bashrc`, `.zshrc`, etc.
+4. **System environment** — System-wide environment variables
+5. **Default values** — Built-in defaults if no value is found
+
+<Note>
+The CLI does **not** read from `.env` files. Use shell exports or command-line variables instead.
+</Note>
+
+## OAuth Flow Details
+
+When you run `gigadrive login`, the CLI:
+
+1. Fetches the OIDC discovery document from `GIGADRIVE_NETWORK_OAUTH_ISSUER_URL`
+2. Extracts the authorization and token endpoints
+3. Starts a local HTTP server on a random port
+4. Opens your browser to the authorization URL with:
+   - `client_id` from `GIGADRIVE_NETWORK_OAUTH_CLIENT_ID`
+   - `redirect_uri` pointing to the local server
+   - `scope: offline_access openid profile email`
+5. Exchanges the authorization code for tokens
+6. Stores the tokens in `~/.gigadrive/auth.json`
+
+## API Authentication
+
+All deployment API requests include an `Authorization: Bearer <token>` header. The token is:
+
+1. Retrieved from `~/.gigadrive/auth.json`
+2. Automatically refreshed if expired using the refresh token
+3. Re-prompts login if the refresh token is invalid
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OAuth discovery failed">
+    If you see `OIDC discovery returned incomplete endpoints`, check that:
+    
+    1. `GIGADRIVE_NETWORK_OAUTH_ISSUER_URL` is correct
+    2. The issuer URL is accessible from your machine
+    3. The discovery endpoint returns valid JSON
+    
+    **Test the discovery endpoint:**
+    ```bash
+    curl https://idp.gigadrive.de/.well-known/openid-configuration
+    ```
+  </Accordion>
+
+  <Accordion title="Authentication failed">
+    If API requests fail with authentication errors:
+    
+    1. Run `gigadrive logout` then `gigadrive login`
+    2. Check that `~/.gigadrive/auth.json` exists and has valid tokens
+    3. Verify `GIGADRIVE_API_BASE_URL` points to the correct API
+  </Accordion>
+
+  <Accordion title="API connection refused">
+    If you see connection errors:
+    
+    1. Verify `GIGADRIVE_API_BASE_URL` is accessible
+    2. Check for network/firewall issues
+    3. Confirm the API server is running
+    
+    **Test the API:**
+    ```bash
+    curl $GIGADRIVE_API_BASE_URL/health
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Development vs. Production
+
+You can use different environment variables for different environments:
+
+### Development
+
+```bash
+export GIGADRIVE_API_BASE_URL=http://localhost:3000
+gigadrive platform deploy
+```
+
+### Staging
+
+```bash
+export GIGADRIVE_API_BASE_URL=https://api.staging.gigadrive.network
+export GIGADRIVE_NETWORK_OAUTH_ISSUER_URL=https://idp.staging.gigadrive.de
+gigadrive platform deploy
+```
+
+### Production
+
+```bash
+export GIGADRIVE_API_BASE_URL=https://api.gigadrive.network
+export GIGADRIVE_NETWORK_OAUTH_ISSUER_URL=https://idp.gigadrive.de
+gigadrive platform deploy
+```
+
+<Tip>
+Consider using shell aliases or functions to switch between environments quickly:
+
+```bash ~/.zshrc
+alias gn-dev='GIGADRIVE_API_BASE_URL=http://localhost:3000 gigadrive'
+alias gn-staging='GIGADRIVE_API_BASE_URL=https://api.staging.gigadrive.network gigadrive'
+alias gn-prod='gigadrive'  # Uses defaults
+```
+</Tip>
+
+## Security Best Practices
+
+<Warning>
+**Never commit environment variables containing secrets to version control.**
+</Warning>
+
+- Store production credentials in secure secret management systems
+- Use different OAuth clients for development and production
+- Rotate credentials regularly
+- Limit OAuth scopes to only what's necessary
+- Review `~/.gigadrive/auth.json` permissions (should be 0600)
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Configuration Overview" icon="file" href="/cli/configuration/overview">
+    Learn about gigadrive.yaml configuration
+  </Card>
+  <Card title="Login Command" icon="lock" href="/cli/commands/login">
+    Authenticate with the Gigadrive Network
+  </Card>
+</CardGroup>

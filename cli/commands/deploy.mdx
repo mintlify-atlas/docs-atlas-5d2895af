@@ -1,0 +1,268 @@
+---
+title: gigadrive platform deploy
+description: Deploy your application to the Gigadrive Network
+---
+
+The `gigadrive platform deploy` command packages your application into an archive and deploys it to the Gigadrive Network. It handles project configuration resolution, archive creation, multipart upload, and real-time deployment monitoring.
+
+## Usage
+
+```bash
+gigadrive platform deploy
+```
+
+## Description
+
+The deploy command executes the following workflow:
+
+1. Resolves your project configuration from `gigadrive.yaml` (or auto-detects framework)
+2. Creates a deployment on the Gigadrive platform
+3. Creates a ZIP archive of your project with appropriate ignore rules
+4. Uploads the archive using multipart upload (10 MB chunks, 3 concurrent)
+5. Polls deployment status and streams build logs in real-time
+6. Displays the deployment URL when complete
+
+The command requires authentication - run `gigadrive login` first if you're not already authenticated.
+
+## Examples
+
+### Deploy a Next.js application
+
+```bash
+cd my-nextjs-app
+gigadrive platform deploy
+```
+
+**Output:**
+```
+Creating deployment...
+Deployment ID: dpl_abc123xyz789
+Creating archive...
+Archive created (2.4 MB)
+Uploading archive...
+Upload complete.
+The deployment pipeline is now being provisioned. This may take a few seconds.
+Status: Pending
+Status: Building
+[Build log output...]
+Status: Provisioning
+[Provisioning log output...]
+Status: Active
+Deployed to https://dpl_abc123xyz789.gigadrivedev.com
+```
+
+### Deploy with custom configuration
+
+Create a `gigadrive.yaml` in your project root:
+
+```yaml gigadrive.yaml
+framework: nextjs
+rootDirectory: ./
+buildOutputDirectory: .next
+environmentVariables:
+  NODE_ENV: production
+  API_URL: https://api.example.com
+```
+
+Then deploy:
+
+```bash
+gigadrive platform deploy
+```
+
+## Deployment Workflow
+
+<Steps>
+  <Step title="Configuration resolution">
+    The CLI resolves your `gigadrive.yaml` or auto-detects your framework from `package.json` and file structure.
+  </Step>
+  
+  <Step title="Create deployment">
+    A new deployment record is created on the platform with a unique deployment ID.
+  </Step>
+  
+  <Step title="Archive creation">
+    Your project is packaged into a ZIP archive. Files matching patterns in `excludeFiles` or standard ignore patterns are excluded.
+  </Step>
+  
+  <Step title="Multipart upload">
+    The archive is uploaded in 10 MB chunks with 3 concurrent uploads for optimal performance.
+  </Step>
+  
+  <Step title="Build & provision">
+    The platform extracts your archive, runs the build process, and provisions infrastructure.
+  </Step>
+  
+  <Step title="Activation">
+    Once provisioning completes, your deployment goes live at a `.gigadrivedev.com` URL.
+  </Step>
+</Steps>
+
+## Archive Creation
+
+The CLI creates a ZIP archive with intelligent file filtering:
+
+### Default Exclusions
+
+Common patterns are automatically excluded:
+- `node_modules/`
+- `.git/`
+- `.env` files
+- Build artifacts (`.next`, `dist`, `build` directories)
+- IDE settings (`.vscode`, `.idea`)
+
+### Custom Exclusions
+
+Add custom exclusions in your `gigadrive.yaml`:
+
+```yaml
+excludeFiles:
+  - "*.log"
+  - "test/**"
+  - ".cache/**"
+  - "*.test.ts"
+```
+
+### Archive Whitelisting
+
+For precise control, use a whitelist:
+
+```yaml
+userArchive:
+  rootOverwrite: ./dist
+  fileWhitelist:
+    - "**/*.js"
+    - "**/*.json"
+    - "public/**"
+```
+
+## Upload Process
+
+The multipart upload process optimizes for large projects:
+
+<AccordionGroup>
+  <Accordion title="Chunk size" icon="cube">
+    Files are split into 10 MB chunks. Each chunk is streamed from disk to minimize memory usage.
+  </Accordion>
+  
+  <Accordion title="Concurrency" icon="network-wired">
+    Up to 3 chunks are uploaded simultaneously for faster transfers.
+  </Accordion>
+  
+  <Accordion title="Progress tracking" icon="chart-line">
+    Each chunk upload is logged with part number and size for visibility.
+  </Accordion>
+  
+  <Accordion title="Presigned URLs" icon="key">
+    The CLI obtains secure presigned URLs from the platform for direct S3 uploads.
+  </Accordion>
+</AccordionGroup>
+
+## Deployment Status
+
+Deployments progress through several states:
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | Deployment created, waiting for upload |
+| `BUILDING` | Running build commands and generating assets |
+| `PROVISIONING` | Creating infrastructure and deploying containers |
+| `ACTIVE` | Deployment is live and serving traffic |
+| `FAILED` | Deployment encountered an error (check logs) |
+| `SUSPENDED` | Deployment has been paused |
+
+## Log Streaming
+
+The command polls for logs every second and displays them in real-time:
+
+- **INFO** logs: Standard output (white)
+- **WARN** logs: Warning messages (yellow)
+- **ERROR** logs: Error messages (red)
+
+Logs are fetched with pagination (100 entries at a time) and displayed incrementally as they become available.
+
+## Error Handling
+
+Comprehensive error handling for all deployment stages:
+
+| Error Type | Stage | Resolution |
+|------------|-------|------------|
+| `ConfigNotFoundError` | Configuration | Create `gigadrive.yaml` or ensure framework is detectable |
+| `ConfigParseError` | Configuration | Fix YAML syntax in `gigadrive.yaml` |
+| `ConfigValidationError` | Configuration | Fix validation errors listed in output |
+| `DeploymentCreateError` | API | Check authentication and network connectivity |
+| `ArchiveCreateError` | Archive | Verify file system permissions and disk space |
+| `UploadStartError` | Upload | Retry deployment or check API status |
+| `UploadPartError` | Upload | Check network connectivity during upload |
+| `UploadCompleteError` | Upload | Retry deployment |
+| `PresignedUrlError` | Upload | API issue - contact support if persistent |
+| `DeploymentAuthError` | API | Run `gigadrive login` to re-authenticate |
+| `DeploymentFailedError` | Build/Provision | Review deployment logs for build errors |
+
+## Environment Variables
+
+<ParamField path="GIGADRIVE_API_BASE_URL" type="string" default="http://localhost:3000">
+  Base URL for the Gigadrive deployment API. Override for custom or enterprise environments.
+</ParamField>
+
+## Performance Optimization
+
+<CardGroup cols={2}>
+  <Card title="Exclude Large Files" icon="file-slash">
+    Use `excludeFiles` to avoid uploading unnecessary large files like videos or datasets.
+  </Card>
+  <Card title="Use .gitignore" icon="git-alt">
+    The archiver respects `.gitignore` patterns by default (when `useIgnoreFiles: true`).
+  </Card>
+  <Card title="Minimize Dependencies" icon="box-open">
+    Production-only dependencies reduce archive size and upload time.
+  </Card>
+  <Card title="Pre-build Assets" icon="gears">
+    Run `gigadrive build` before deploying to catch build errors early.
+  </Card>
+</CardGroup>
+
+## Framework Auto-Detection
+
+If no `gigadrive.yaml` exists, the CLI auto-detects your framework:
+
+- **Next.js** - Detected from `next.config.js` or `next` in dependencies
+- **Remix** - Detected from `remix.config.js`
+- **Nuxt** - Detected from `nuxt.config.ts`
+- **Astro** - Detected from `astro.config.mjs`
+- **SvelteKit** - Detected from `svelte.config.js`
+- **Vite** - Detected from `vite.config.ts`
+- **Static** - Fallback for HTML/CSS/JS projects
+
+## Deployment URL
+
+Upon successful deployment, your application is available at:
+
+```
+https://{deploymentId}.gigadrivedev.com
+```
+
+The deployment ID is a branded string identifier (e.g., `dpl_abc123xyz789`).
+
+<Note>
+  Custom domains can be configured after deployment through the Gigadrive dashboard.
+</Note>
+
+## Related Commands
+
+- [`gigadrive build`](/cli/commands/build) - Build your project locally
+- [`gigadrive debug config`](/cli/commands/debug) - View resolved configuration
+- [`gigadrive login`](/cli/commands/login) - Authenticate with the platform
+
+## Implementation
+
+The deploy command uses Effect-TS with multiple services:
+
+- **ProjectConfigService** - Resolves `gigadrive.yaml` with auto-detection fallback
+- **DeploymentApiService** - Handles all API interactions (create, upload, status, logs)
+- **ArchiveService** - Creates ZIP archives with glob patterns and ignore rules
+- **FileSystem** - Streams archive chunks for memory-efficient uploads
+
+Multipart upload is implemented with `Effect.all` for concurrency control and streams chunks directly from disk using `FileSystem.stream`.
+
+Source: `packages/cli/src/commands/platform/deploy/index.ts:12`

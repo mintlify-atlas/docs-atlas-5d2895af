@@ -1,0 +1,190 @@
+---
+title: Configuration Overview
+description: Learn how to configure the Gigadrive CLI for your projects
+---
+
+The Gigadrive CLI uses a combination of configuration files and environment variables to manage your deployments.
+
+## Configuration Files
+
+The CLI looks for a `gigadrive.yaml` (or `gigadrive.json`) configuration file in your project directory. This file defines how your project should be built and deployed.
+
+### Configuration Resolution
+
+When you run CLI commands, the configuration is resolved in the following order:
+
+1. **Config file + Framework detection** — If both `gigadrive.yaml` and a supported framework are detected, the CLI merges your config with framework-specific defaults
+2. **Config file only** — If only a config file exists, it's parsed and validated
+3. **Framework detection only** — If no config file exists but a framework is detected, default configuration is generated
+4. **No configuration** — If neither exists, the CLI will report an error
+
+<Note>
+Framework auto-detection works for Next.js, Nuxt, SvelteKit, Remix, Astro, Vite, Express, Fastify, Hono, Elysia, NestJS, Laravel, and Symfony.
+</Note>
+
+## Configuration File Format
+
+The CLI uses version 4 of the configuration schema. Here's a minimal example:
+
+```yaml gigadrive.yaml
+version: 4
+regions:
+  - global
+build_commands:
+  - npm install
+  - npm run build
+functions:
+  api/*.ts:
+    runtime: node-22
+    memory: 256
+    max_duration: 30
+```
+
+### Key Configuration Options
+
+<AccordionGroup>
+  <Accordion title="regions">
+    The regions where your project will be deployed. Use `global` to deploy to all available regions.
+    
+    Available regions:
+    - `us-east-1`, `us-east-2`, `us-west-1`, `us-west-2`
+    - `eu-central-1`, `eu-west-1`, `eu-west-2`, `eu-west-3`, `eu-north-1`
+    - `ap-south-1`, `ap-northeast-1`, `ap-northeast-2`, `ap-northeast-3`, `ap-southeast-1`, `ap-southeast-2`
+    - `ca-central-1`, `sa-east-1`
+  </Accordion>
+
+  <Accordion title="build_commands">
+    An array of shell commands to run during the build process.
+    
+    ```yaml
+    build_commands:
+      - bun install
+      - bun run build
+    ```
+  </Accordion>
+
+  <Accordion title="assets">
+    The folder containing static assets to deploy to the edge.
+    
+    ```yaml
+    assets: dist/public
+    populateAssetCache: true
+    ```
+  </Accordion>
+
+  <Accordion title="functions">
+    Serverless function configurations with glob patterns.
+    
+    ```yaml
+    functions:
+      src/*.ts:
+        runtime: bun-1
+        memory: 128
+        max_duration: 15
+      src/cron.ts:
+        schedule: rate(5 minutes)
+    ```
+    
+    Available runtimes: `node-16`, `node-18`, `node-20`, `node-22`, `bun-1`, `php-81`, `php-83`, `php-84`
+  </Accordion>
+
+  <Accordion title="routes">
+    Route definitions for mapping requests to functions or assets.
+    
+    ```yaml
+    routes:
+      - source: /api/*
+        destination: src/api.ts
+      - source: /*
+        destination: src/index.ts
+    ```
+  </Accordion>
+
+  <Accordion title="services">
+    Additional services like Redis or Postgres.
+    
+    ```yaml
+    services:
+      redis:
+        primaryRegion: us-east-1
+        eviction: true
+      postgres:
+        region: us-east-1
+        postgresVersion: '17'
+    ```
+  </Accordion>
+
+  <Accordion title="env">
+    Environment variables for runtime and build.
+    
+    ```yaml
+    env:
+      DATABASE_URL: postgresql://...
+      API_KEY: your-api-key
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Example Configuration
+
+Here's a complete example showing various features:
+
+```yaml gigadrive.yaml
+version: 4
+regions:
+  - us-east-1
+  - eu-central-1
+build_commands:
+  - bun install
+functions:
+  src/*.ts:
+    memory: 128
+    max_duration: 15
+    runtime: bun-1
+    symlinks:
+      var/log: /tmp/logs
+  src/cron.ts:
+    schedule: rate(5 minutes)
+routes:
+  - source: /api/*
+    destination: src/api.ts
+    has:
+      - type: header
+        key: Authorization
+        value: Bearer test
+  - source: /*
+    destination: pages/$1.tsx?
+  - source: /docs/*
+    destination: 'https://docs.example.com/$1'
+  - source: /*
+    destination: src/index.ts
+services:
+  redis: ~
+env:
+  NODE_ENV: production
+```
+
+## Storage Location
+
+The CLI stores authentication tokens and other local data in:
+
+```
+~/.gigadrive/auth.json
+```
+
+This file has restricted permissions (0600) and should never be committed to version control.
+
+<Warning>
+The auth storage file contains sensitive tokens. Never share or commit this file.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/cli/configuration/environment-variables">
+    Configure the CLI using environment variables
+  </Card>
+  <Card title="Deploy Command" icon="rocket" href="/cli/commands/deploy">
+    Learn how to deploy your project
+  </Card>
+</CardGroup>

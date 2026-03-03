@@ -1,0 +1,486 @@
+---
+title: "Framework Detection"
+description: "Automatically detect web frameworks and generate deployment configurations"
+---
+
+## Overview
+
+The detection module automatically identifies web frameworks in a project by checking dependencies and file structure, then generates appropriate deployment configurations. This enables zero-config deployments for supported frameworks.
+
+## Core Function
+
+### detectFramework
+
+Detects the framework used in a project by checking framework definitions against the project's dependencies and file structure. Framework definitions are checked in priority order (highest first), and all detectors for a framework must match for it to be selected.
+
+```typescript
+export const detectFramework: Effect.Effect<
+  DetectionResult,
+  FrameworkNotDetectedError | ManifestReadError | ManifestParseError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<DetectionResult>">
+  Effect that returns the detection result with framework, package manager, and generated config
+  
+  <Expandable title="DetectionResult properties">
+    <ResponseField name="framework" type="FrameworkDefinition">
+      The detected framework definition
+    </ResponseField>
+    
+    <ResponseField name="packageManager" type="PackageManager">
+      The detected package manager (`'npm'` | `'yarn'` | `'pnpm'` | `'bun'` | `'composer'`)
+    </ResponseField>
+    
+    <ResponseField name="config" type="NormalizedConfig">
+      The generated deployment configuration for the detected framework
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+import { detectFramework } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = detectFramework('/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+
+console.log('Detected framework:', result.framework.name);
+console.log('Package manager:', result.packageManager);
+console.log('Generated config:', result.config);
+```
+
+---
+
+### detectPackageManager
+
+Detects the package manager used in a Node.js project by checking for lock files.
+
+```typescript
+export const detectPackageManager: Effect.Effect<
+  PackageManager,
+  never,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<PackageManager>">
+  Effect that returns the detected package manager. Defaults to `'npm'` if no lock file is found.
+</ResponseField>
+
+#### Detection Logic
+
+- `bun.lockb` → `'bun'`
+- `pnpm-lock.yaml` → `'pnpm'`
+- `yarn.lock` → `'yarn'`
+- Default → `'npm'`
+
+#### Example
+
+```typescript
+import { detectPackageManager } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = detectPackageManager('/path/to/project');
+
+const packageManager = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+
+console.log('Package manager:', packageManager);
+```
+
+---
+
+### generateConfig
+
+Generates a `NormalizedConfig` from a framework definition and package manager.
+
+```typescript
+export const generateConfig: Effect.Effect<
+  NormalizedConfig,
+  never,
+  never
+>
+```
+
+<ParamField path="framework" type="FrameworkDefinition" required>
+  The framework definition
+</ParamField>
+
+<ParamField path="packageManager" type="PackageManager" required>
+  The package manager to use
+</ParamField>
+
+<ResponseField name="return" type="Effect<NormalizedConfig>">
+  Effect that returns the generated configuration
+</ResponseField>
+
+#### Example
+
+```typescript
+import { generateConfig, FRAMEWORK_DEFINITIONS } from '@gigadrive/network-config';
+import { Effect } from 'effect';
+
+const nextjs = FRAMEWORK_DEFINITIONS.find(f => f.slug === 'nextjs')!;
+
+const program = generateConfig(nextjs, 'pnpm');
+
+const config = await Effect.runPromise(program);
+```
+
+---
+
+### mergeConfig
+
+Merges a user-provided config with a framework-detected config. User config takes precedence for all fields.
+
+```typescript
+export const mergeConfig: (
+  userConfig: NormalizedConfig,
+  frameworkConfig: NormalizedConfig
+) => NormalizedConfig
+```
+
+<ParamField path="userConfig" type="NormalizedConfig" required>
+  User-provided configuration (takes precedence)
+</ParamField>
+
+<ParamField path="frameworkConfig" type="NormalizedConfig" required>
+  Framework-detected configuration (fills gaps)
+</ParamField>
+
+<ResponseField name="return" type="NormalizedConfig">
+  Merged configuration
+</ResponseField>
+
+#### Example
+
+```typescript
+import { mergeConfig } from '@gigadrive/network-config';
+
+const merged = mergeConfig(userConfig, frameworkConfig);
+```
+
+---
+
+### readDependencies
+
+Reads the dependency manifest (package.json or composer.json) and returns all dependency names as a Set.
+
+```typescript
+export const readDependencies: Effect.Effect<
+  Set<string>,
+  ManifestReadError | ManifestParseError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ParamField path="language" type="FrameworkLanguage" required>
+  The language to check (`'node'` or `'php'`)
+</ParamField>
+
+<ResponseField name="return" type="Effect<Set<string>>">
+  Effect that returns a set of all dependency names (combines dependencies, devDependencies, and peerDependencies)
+</ResponseField>
+
+#### Example
+
+```typescript
+import { readDependencies } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = readDependencies('/path/to/project', 'node');
+
+const deps = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+
+if (deps.has('next')) {
+  console.log('Next.js is installed');
+}
+```
+
+## Supported Frameworks
+
+The following frameworks are supported (in priority order):
+
+<AccordionGroup>
+  <Accordion title="Next.js" icon="react">
+    - **Slug**: `nextjs`
+    - **Language**: `node`
+    - **Priority**: 100
+    - **Detection**: Checks for `next` package in dependencies
+    - **Runtime**: `node-20`
+    - **Build Command**: `next build`
+  </Accordion>
+
+  <Accordion title="Nuxt" icon="vuejs">
+    - **Slug**: `nuxt`
+    - **Language**: `node`
+    - **Priority**: 90
+    - **Detection**: Checks for `nuxt` package and `nuxt.config.ts` file
+    - **Runtime**: `node-20`
+    - **Build Command**: `nuxt build`
+  </Accordion>
+
+  <Accordion title="NestJS" icon="n">
+    - **Slug**: `nestjs`
+    - **Language**: `node`
+    - **Priority**: 85
+    - **Detection**: Checks for `@nestjs/core` package
+    - **Runtime**: `node-20`
+    - **Build Command**: `nest build`
+  </Accordion>
+
+  <Accordion title="Remix" icon="react">
+    - **Slug**: `remix`
+    - **Language**: `node`
+    - **Priority**: 80
+    - **Detection**: Checks for `@remix-run/dev` package
+    - **Runtime**: `node-20`
+    - **Build Command**: `remix build`
+  </Accordion>
+
+  <Accordion title="SvelteKit" icon="s">
+    - **Slug**: `sveltekit`
+    - **Language**: `node`
+    - **Priority**: 75
+    - **Detection**: Checks for `@sveltejs/kit` package
+    - **Runtime**: `node-20`
+    - **Build Command**: `vite build`
+  </Accordion>
+
+  <Accordion title="Astro" icon="star">
+    - **Slug**: `astro`
+    - **Language**: `node`
+    - **Priority**: 70
+    - **Detection**: Checks for `astro` package
+    - **Runtime**: `node-20`
+    - **Build Command**: `astro build`
+  </Accordion>
+
+  <Accordion title="Laravel" icon="php">
+    - **Slug**: `laravel`
+    - **Language**: `php`
+    - **Priority**: 65
+    - **Detection**: Checks for `laravel/framework` package
+    - **Runtime**: `php-83`
+  </Accordion>
+
+  <Accordion title="Symfony" icon="symfony">
+    - **Slug**: `symfony`
+    - **Language**: `php`
+    - **Priority**: 60
+    - **Detection**: Checks for `symfony/framework-bundle` package
+    - **Runtime**: `php-83`
+  </Accordion>
+
+  <Accordion title="Hono" icon="h">
+    - **Slug**: `hono`
+    - **Language**: `node`
+    - **Priority**: 55
+    - **Detection**: Checks for `hono` package
+    - **Runtime**: `node-20`
+  </Accordion>
+
+  <Accordion title="Elysia" icon="e">
+    - **Slug**: `elysia`
+    - **Language**: `node`
+    - **Priority**: 50
+    - **Detection**: Checks for `elysia` package
+    - **Runtime**: `bun-1`
+  </Accordion>
+
+  <Accordion title="Fastify" icon="bolt">
+    - **Slug**: `fastify`
+    - **Language**: `node`
+    - **Priority**: 45
+    - **Detection**: Checks for `fastify` package
+    - **Runtime**: `node-20`
+  </Accordion>
+
+  <Accordion title="Express" icon="server">
+    - **Slug**: `express`
+    - **Language**: `node`
+    - **Priority**: 40
+    - **Detection**: Checks for `express` package
+    - **Runtime**: `node-20`
+  </Accordion>
+
+  <Accordion title="Vite" icon="v">
+    - **Slug**: `vite`
+    - **Language**: `node`
+    - **Priority**: 10
+    - **Detection**: Checks for `vite` package and `vite.config.ts` file
+    - **Runtime**: `node-20`
+    - **Build Command**: `vite build`
+  </Accordion>
+</AccordionGroup>
+
+## Framework Definition
+
+Each framework is defined by a `FrameworkDefinition` object:
+
+```typescript
+interface FrameworkDefinition {
+  slug: string;
+  name: string;
+  language: 'node' | 'php';
+  detectors: FrameworkDetectionItem[];
+  priority: number;
+  getDefaultConfig: (packageManager: PackageManager) => FrameworkDefaultConfig;
+}
+```
+
+### FrameworkDetectionItem
+
+Each detector can check:
+
+<ParamField path="matchPackage" type="string" optional>
+  Package name to check in dependencies (routes to the correct manifest based on framework language)
+</ParamField>
+
+<ParamField path="path" type="string" optional>
+  File path to check (relative to project root)
+</ParamField>
+
+<ParamField path="matchContent" type="string" optional>
+  Regex pattern to match against file content (only when `path` is set)
+</ParamField>
+
+### FrameworkDefaultConfig
+
+The generated config includes:
+
+<ResponseField name="runtime" type="Runtime">
+  The default runtime for the framework
+</ResponseField>
+
+<ResponseField name="memory" type="number">
+  Default memory allocation in MB
+</ResponseField>
+
+<ResponseField name="maxDuration" type="number">
+  Default max duration in seconds
+</ResponseField>
+
+<ResponseField name="streaming" type="boolean">
+  Whether response streaming is supported
+</ResponseField>
+
+<ResponseField name="installCommand" type="string" optional>
+  Custom install command (overrides auto-generated one)
+</ResponseField>
+
+<ResponseField name="commands" type="string[]">
+  Build commands (install command is auto-prepended)
+</ResponseField>
+
+<ResponseField name="entrypoint" type="string" optional>
+  Path to the entrypoint file
+</ResponseField>
+
+<ResponseField name="assetsDir" type="string" optional>
+  Static assets directory
+</ResponseField>
+
+<ResponseField name="populateAssetCache" type="boolean" optional>
+  Whether to populate edge cache for assets
+</ResponseField>
+
+<ResponseField name="routes" type="Array<{source: string, destination: string}>">
+  Default route definitions
+</ResponseField>
+
+<ResponseField name="environmentVariables" type="Record<string, string>">
+  Default environment variables
+</ResponseField>
+
+<ResponseField name="symlinks" type="Record<string, string>" optional>
+  Symlink definitions
+</ResponseField>
+
+<ResponseField name="excludeFiles" type="string[]" optional>
+  Glob patterns for files to exclude
+</ResponseField>
+
+## Error Types
+
+### FrameworkNotDetectedError
+
+Thrown when no framework matches the project.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="directory" type="string">
+  Project directory that was scanned
+</ParamField>
+
+### ManifestReadError
+
+Thrown when the package manifest cannot be read.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the manifest file
+</ParamField>
+
+### ManifestParseError
+
+Thrown when the package manifest exists but cannot be parsed.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the manifest file
+</ParamField>
+
+## Effect Context
+
+All detection functions require:
+
+- `FileSystem.FileSystem` - File system operations
+- `Path.Path` - Path manipulation
+
+Provide via `NodeContext.layer`:
+
+```typescript
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+import { detectFramework } from '@gigadrive/network-config';
+
+const program = detectFramework('/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```

@@ -1,0 +1,123 @@
+---
+title: gigadrive whoami
+description: Display information about the currently authenticated user
+---
+
+The `gigadrive whoami` command retrieves and displays information about the currently authenticated user from the Gigadrive Network identity provider.
+
+## Usage
+
+```bash
+gigadrive whoami
+```
+
+## Description
+
+This command fetches user information from the OIDC userinfo endpoint using your stored access token. It displays all available profile information in JSON format, including email, name, and other identity claims provided by the identity provider.
+
+If you are not logged in, the command will prompt you to run `gigadrive login` first.
+
+## Examples
+
+### Display current user
+
+```bash
+gigadrive whoami
+```
+
+**Output:**
+```json
+{
+  "sub": "auth0|1234567890abcdef",
+  "email": "jane@example.com",
+  "email_verified": true,
+  "name": "Jane Doe",
+  "nickname": "jane",
+  "picture": "https://example.com/avatar.jpg",
+  "updated_at": "2024-03-15T10:30:00.000Z"
+}
+```
+
+### When not logged in
+
+```bash
+gigadrive whoami
+```
+
+**Output:**
+```
+You are not logged in. Run "gigadrive login" to authenticate.
+```
+
+## Output Format
+
+The command outputs a JSON object containing OpenID Connect standard claims and provider-specific claims. Common fields include:
+
+<ResponseField name="sub" type="string" required>
+  Subject identifier - a unique identifier for the user from the identity provider.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address.
+</ResponseField>
+
+<ResponseField name="email_verified" type="boolean">
+  Whether the email address has been verified.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name.
+</ResponseField>
+
+<ResponseField name="nickname" type="string">
+  User's display name or username.
+</ResponseField>
+
+<ResponseField name="picture" type="string">
+  URL to the user's profile picture.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp of the last profile update (ISO 8601 format).
+</ResponseField>
+
+## Error Handling
+
+The command handles the following error scenarios:
+
+| Error Type | Description | Resolution |
+|------------|-------------|------------|
+| `NotAuthenticatedError` | No valid authentication token found | Run `gigadrive login` to authenticate |
+| `UserInfoFetchError` | Failed to fetch user information from the API | Check network connectivity and token validity |
+| `OAuthDiscoveryError` | Unable to discover the userinfo endpoint | Verify OIDC issuer configuration |
+
+## Token Refresh
+
+If your access token has expired, the command will automatically attempt to refresh it using your stored refresh token before fetching user information. If the refresh fails, you'll need to log in again.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Verify Login" icon="user-check">
+    Confirm that you're logged in with the correct account before deploying.
+  </Card>
+  <Card title="Debug Auth Issues" icon="bug">
+    Check if authentication tokens are valid and accessible.
+  </Card>
+  <Card title="CI/CD Validation" icon="circle-check">
+    Verify service account credentials in automated pipelines.
+  </Card>
+  <Card title="Identity Verification" icon="id-badge">
+    Confirm user identity details for compliance or auditing.
+  </Card>
+</CardGroup>
+
+## Related Commands
+
+- [`gigadrive login`](/cli/commands/login) - Authenticate with Gigadrive Network
+
+## Implementation
+
+The whoami command uses the AuthService to retrieve cached tokens and call the OIDC userinfo endpoint. The command is implemented as a zero-argument Effect that yields user information or fails with a typed error.
+
+Source: `packages/cli/src/commands/whoami/index.ts:5`

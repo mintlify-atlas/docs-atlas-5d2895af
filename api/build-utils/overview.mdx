@@ -1,0 +1,100 @@
+---
+title: "Build Utils Overview"
+description: "Build utilities for file operations, command execution, and archive management"
+---
+
+## Overview
+
+`@gigadrive/build-utils` provides essential build utilities for the Gigadrive SDK, including:
+
+- **Command Execution**: Run shell commands asynchronously with streaming output
+- **File Downloads**: Download files from URLs with streaming support
+- **File Pattern Matching**: Find files using glob or regex patterns with exclusions
+- **Archive Operations**: Create and extract archives (planned)
+
+## Installation
+
+```bash
+npm install @gigadrive/build-utils
+```
+
+## Quick Start
+
+```typescript
+import { exec, downloadFile, getFilesForPattern } from '@gigadrive/build-utils';
+
+// Execute a command
+await exec({
+  command: 'npm install',
+  cwd: '/path/to/project',
+  onOutput: (data) => console.log(data),
+});
+
+// Download a file
+await downloadFile(
+  'https://example.com/file.zip',
+  '/path/to/output.zip'
+);
+
+// Find files matching a pattern
+const files = await getFilesForPattern(
+  '**/*.ts',
+  '/path/to/project',
+  ['node_modules/**', '**/*.test.ts']
+);
+```
+
+## Package Information
+
+<ParamField path="version" type="string">
+  Current version: `1.0.1`
+</ParamField>
+
+<ParamField path="license" type="string">
+  Apache-2.0
+</ParamField>
+
+<ParamField path="repository" type="string">
+  [github.com/Gigadrive/sdk](https://github.com/Gigadrive/sdk)
+</ParamField>
+
+## Requirements
+
+- Node.js >= 18.0.0
+- TypeScript >= 5.0.0
+
+## Features
+
+### Command Execution
+
+The `exec` function runs shell commands in a child process with support for:
+- Custom working directory
+- Environment variables
+- Streaming stdout/stderr output
+- Error handling and exit codes
+
+### File Operations
+
+Stream-based file downloads that:
+- Avoid loading entire files into memory
+- Create output directories automatically
+- Provide detailed error messages
+
+### Pattern Matching
+
+Flexible file search with:
+- Glob pattern support via `minimatch`
+- Regular expression matching
+- Multiple exclusion patterns
+- Recursive directory traversal
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="File Operations" icon="file" href="/api/build-utils/file-operations">
+    Learn about exec, downloads, and pattern matching
+  </Card>
+  <Card title="Archive Utilities" icon="box-archive" href="/api/build-utils/archive">
+    Archive creation and extraction (planned)
+  </Card>
+</CardGroup>

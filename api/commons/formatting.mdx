@@ -1,0 +1,164 @@
+---
+title: "Formatting"
+description: "Functions for formatting data into human-readable strings"
+---
+
+## Overview
+
+The formatting module provides utilities to convert raw data into human-readable formats. Currently includes file size formatting with support for various units.
+
+## Functions
+
+### formatFileSize()
+
+Converts a file size from bytes to a human-readable string with appropriate units.
+
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
+
+const size = formatFileSize(123456789);
+console.log(size); // "117.74 MB"
+```
+
+<ParamField path="bytes" type="number" required>
+  The file size in bytes. Should be a non-negative number.
+</ParamField>
+
+<ResponseField name="formattedSize" type="string">
+  A string representing the file size in the most appropriate unit (B, KB, MB, GB, TB, PB, EB, ZB, YB) with up to 2 decimal places.
+</ResponseField>
+
+## Usage Examples
+
+### Basic File Size Formatting
+
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
+
+// Zero bytes
+console.log(formatFileSize(0)); // "0 B"
+
+// Bytes
+console.log(formatFileSize(1)); // "1 B"
+console.log(formatFileSize(100)); // "100 B"
+console.log(formatFileSize(999)); // "999 B"
+
+// Kilobytes
+console.log(formatFileSize(1024)); // "1 KB"
+console.log(formatFileSize(1260)); // "1.23 KB"
+console.log(formatFileSize(1536)); // "1.5 KB"
+
+// Megabytes
+console.log(formatFileSize(1048576)); // "1 MB"
+console.log(formatFileSize(2097152)); // "2 MB"
+console.log(formatFileSize(2621440)); // "2.5 MB"
+console.log(formatFileSize(123456789)); // "117.74 MB"
+
+// Gigabytes
+console.log(formatFileSize(1073741824)); // "1 GB"
+console.log(formatFileSize(1610612736)); // "1.5 GB"
+console.log(formatFileSize(2684354560)); // "2.5 GB"
+
+// Terabytes
+console.log(formatFileSize(1099511627776)); // "1 TB"
+console.log(formatFileSize(1649267441664)); // "1.5 TB"
+```
+
+### Displaying File Upload Progress
+
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
+
+function displayUploadProgress(uploadedBytes: number, totalBytes: number) {
+  const uploaded = formatFileSize(uploadedBytes);
+  const total = formatFileSize(totalBytes);
+  const percentage = ((uploadedBytes / totalBytes) * 100).toFixed(1);
+  
+  console.log(`Uploaded ${uploaded} of ${total} (${percentage}%)`);
+}
+
+displayUploadProgress(52428800, 104857600);
+// "Uploaded 50 MB of 100 MB (50.0%)"
+```
+
+### Formatting Directory Sizes
+
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+
+async function getDirectorySize(dirPath: string): Promise<number> {
+  let totalSize = 0;
+  const files = await readdir(dirPath, { withFileTypes: true });
+  
+  for (const file of files) {
+    const filePath = join(dirPath, file.name);
+    const stats = await stat(filePath);
+    
+    if (stats.isFile()) {
+      totalSize += stats.size;
+    } else if (stats.isDirectory()) {
+      totalSize += await getDirectorySize(filePath);
+    }
+  }
+  
+  return totalSize;
+}
+
+const size = await getDirectorySize('./my-directory');
+console.log(`Directory size: ${formatFileSize(size)}`);
+```
+
+### File List Display
+
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
+
+interface FileInfo {
+  name: string;
+  size: number;
+}
+
+const files: FileInfo[] = [
+  { name: 'document.pdf', size: 2097152 },
+  { name: 'image.png', size: 524288 },
+  { name: 'video.mp4', size: 157286400 },
+  { name: 'archive.zip', size: 1073741824 }
+];
+
+files.forEach(file => {
+  console.log(`${file.name.padEnd(20)} ${formatFileSize(file.size)}`);
+});
+
+// Output:
+// document.pdf         2 MB
+// image.png            512 KB
+// video.mp4            150 MB
+// archive.zip          1 GB
+```
+
+## Unit Conversion Details
+
+The function uses binary (base-1024) conversion:
+
+| Unit | Bytes | Example |
+|------|-------|----------|
+| B | 1 | `formatFileSize(500)` → "500 B" |
+| KB | 1,024 | `formatFileSize(1024)` → "1 KB" |
+| MB | 1,048,576 | `formatFileSize(1048576)` → "1 MB" |
+| GB | 1,073,741,824 | `formatFileSize(1073741824)` → "1 GB" |
+| TB | 1,099,511,627,776 | `formatFileSize(1099511627776)` → "1 TB" |
+| PB | 1,125,899,906,842,624 | `formatFileSize(1125899906842624)` → "1 PB" |
+
+<Note>
+  **Precision**: The function displays up to 2 decimal places. Trailing zeros are automatically removed (e.g., "2.50 MB" becomes "2.5 MB").
+</Note>
+
+<Note>
+  **Binary vs Decimal**: This function uses binary units (1 KB = 1024 bytes), which is the standard for file systems and storage. This differs from SI units where 1 kB = 1000 bytes.
+</Note>
+
+## Source Code
+
+View the source code: [format.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/format.ts)

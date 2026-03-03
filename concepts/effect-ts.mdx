@@ -1,0 +1,465 @@
+---
+title: Effect-TS Architecture
+description: Understanding how the Gigadrive CLI uses Effect-TS for type-safe, composable side effects
+---
+
+The Gigadrive CLI is built entirely with **Effect-TS**, a powerful library for managing side effects with end-to-end type safety, structured error handling, and composable dependency injection. Every HTTP request, file operation, OAuth flow, and process execution flows through the Effect runtime.
+
+## Why Effect-TS?
+
+Effect-TS transforms how we handle side effects in TypeScript:
+
+<CardGroup cols={2}>
+  <Card title="Type-Safe Errors" icon="shield-check">
+    Every error is a typed value in the signature — no more `try/catch` surprises
+  </Card>
+  <Card title="Dependency Injection" icon="puzzle-piece">
+    Services declare dependencies explicitly — no globals, singletons, or magic
+  </Card>
+  <Card title="Composable Effects" icon="layer-group">
+    Effects compose like LEGO blocks — retry, timeout, race, parallel, sequential
+  </Card>
+  <Card title="Observability" icon="magnifying-glass">
+    Built-in tracing, logging, and metrics — debug production issues with ease
+  </Card>
+</CardGroup>
+
+## Core Concepts
+
+### Effect Types
+
+An `Effect` represents a **description** of a side effect that:
+- May **succeed** with a value of type `Success`
+- May **fail** with an error of type `Error`
+- **Requires** services of type `Requirements` to run
+
+```typescript
+import { Effect } from 'effect';
+
+// An effect that reads a file
+type ReadFile = Effect.Effect<
+  string,              // Success: file contents
+  FileNotFoundError,   // Error: specific error type
+  FileSystem           // Requires: FileSystem service
+>;
+```
+
+<Info>
+Effects are **lazy** — they don't run until you call `Effect.runPromise()` or pass them to the Effect runtime.
+</Info>
+
+### Effect.gen — Generator Syntax
+
+Effect uses **generator functions** for async/await-like syntax:
+
+```typescript
+import { Effect } from 'effect';
+
+const program = Effect.gen(function* () {
+  // yield* unwraps Effect values
+  const user = yield* fetchUser('123');
+  const posts = yield* fetchPosts(user.id);
+  
+  // Return the final value
+  return { user, posts };
+});
+
+// Type: Effect<{ user: User, posts: Post[] }, FetchError, HttpClient>
+```
+
+<Note>
+Notice `yield*` (not `yield`) — this unwraps the Effect and gives you the success value.
+</Note>
+
+## Services: Dependency Injection
+
+### Defining a Service
+
+Services are defined with `Effect.Service` and use the **accessors pattern**:
+
+```typescript packages/cli/src/services/auth-storage.ts
+import { Effect } from 'effect';
+import { Schema } from '@effect/schema';
+
+export class AuthStorageService extends Effect.Service<AuthStorageService>()(
+  'AuthStorageService',
+  {
+    accessors: true,
+    effect: Effect.gen(function* () {
+      const configDir = yield* getConfigDir();
+      const authFilePath = `${configDir}/auth.json`;
+
+      const save = (data: StoredAuthData) =>
+        Effect.gen(function* () {
+          yield* Effect.tryPromise({
+            try: () => fs.promises.writeFile(authFilePath, JSON.stringify(data)),
+            catch: (err) => new AuthStorageWriteError({ message: String(err) })
+          });
+        });
+
+      const load = Effect.gen(function* () {
+        const content = yield* Effect.tryPromise({
+          try: () => fs.promises.readFile(authFilePath, 'utf-8'),
+          catch: (err) => new AuthStorageReadError({ message: String(err) })
+        });
+        return JSON.parse(content);
+      });
+
+      return { save, load, remove };
+    })
+  }
+) {}
+```
+
+<Tip>
+The `accessors: true` option generates `yield* AuthStorageService` accessors automatically.
+</Tip>
+
+### Service Dependencies
+
+Services can depend on other services:
+
+```typescript packages/cli/src/services/auth.ts
+export class AuthService extends Effect.Service<AuthService>()(
+  'AuthService',
+  {
+    accessors: true,
+    dependencies: [
+      OAuthConfigService.Default,
+      AuthStorageService.Default
+    ],
+    effect: Effect.gen(function* () {
+      // Access dependencies
+      const oauthConfig = yield* OAuthConfigService;
+      const storage = yield* AuthStorageService;
+
+      const login = Effect.gen(function* () {
+        const config = yield* oauthConfig.getConfig;
+        const tokens = yield* exchangeTokens(config);
+        yield* storage.save(tokens);
+      });
+
+      return { login, logout, getAccessToken };
+    })
+  }
+) {}
+```
+
+### Layer Composition
+
+Services are composed into **layers** at the app root:
+
+```typescript packages/cli/src/index.ts
+import { Layer } from 'effect';
+
+const BaseServices = Layer.mergeAll(
+  OAuthConfigService.Default,
+  AuthStorageService.Default,
+  PackageManagerService.Default,
+  ArchiveService.Default,
+  NetworkConfigLive,
+  ProjectConfigService.Default
+).pipe(
+  Layer.provideMerge(AuthService.Default)
+);
+
+const AppLive = Layer.mergeAll(
+  BaseServices,
+  Logger.minimumLogLevel(LogLevel.Info)
+).pipe(
+  Layer.provideMerge(NodeContext.layer)
+);
+```
+
+<AccordionGroup>
+  <Accordion title="Layer.mergeAll" icon="layer-group">
+    Combines multiple **independent** layers into one. Use for services at the same dependency level.
+  </Accordion>
+  <Accordion title="Layer.provideMerge" icon="link">
+    Provides dependencies **to** a layer. Use when one service depends on others.
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+### Tagged Errors with Schema
+
+All errors are **typed** using `Schema.TaggedError`:
+
+```typescript packages/cli/src/errors.ts
+import { Schema } from '@effect/schema';
+
+export class TokenRefreshError extends Schema.TaggedError<TokenRefreshError>()(
+  'TokenRefreshError',
+  {
+    message: Schema.String,
+    statusCode: Schema.optional(Schema.Number)
+  }
+) {}
+
+export class NotAuthenticatedError extends Schema.TaggedError<NotAuthenticatedError>()(
+  'NotAuthenticatedError',
+  {
+    message: Schema.String
+  }
+) {}
+```
+
+<Info>
+Tagged errors enable **pattern matching** with `Effect.catchTag` and `Effect.catchTags`.
+</Info>
+
+### Catching Specific Errors
+
+Use `catchTag` or `catchTags` to handle specific error types:
+
+```typescript packages/cli/src/commands/login/index.ts
+import { Command } from '@effect/cli';
+import { Console, Effect } from 'effect';
+
+export const loginCommand = Command.make('login', {}, () =>
+  Effect.gen(function* () {
+    yield* Console.log('Initiating login...');
+
+    const auth = yield* AuthService;
+    yield* auth.login;
+
+    const info = yield* auth.getUserInfo.pipe(
+      Effect.catchAll(() => Effect.succeed({} as Record<string, unknown>))
+    );
+
+    const name = auth.inferUserName(info);
+    yield* Console.log(`You are now logged in as ${name}.`);
+  }).pipe(
+    Effect.catchTags({
+      LoginFlowError: (err) => Console.error(`Login failed: ${err.message}`),
+      TokenExchangeError: (err) => Console.error(`Login failed: ${err.message}`),
+      OAuthDiscoveryError: (err) => Console.error(`Login failed: ${err.message}`),
+      AuthStorageWriteError: (err) => Console.error(`Failed to save credentials: ${err.message}`)
+    })
+  )
+);
+```
+
+<Tip>
+`catchTags` provides **exhaustive pattern matching** — TypeScript ensures you handle all declared errors.
+</Tip>
+
+## Real-World Example: OAuth Login Flow
+
+Here's how the CLI implements OAuth login using Effect-TS:
+
+```typescript packages/cli/src/services/auth.ts (simplified)
+const login = Effect.gen(function* () {
+  // 1. Clear existing session
+  yield* logout;
+
+  // 2. Generate PKCE challenge
+  const { codeVerifier, codeChallenge } = generatePKCE();
+  const state = crypto.randomBytes(16).toString('hex');
+
+  // 3. Get OAuth config (from OIDC discovery)
+  const config = yield* oauthConfig.getConfig;
+
+  // 4. Start local callback server and open browser
+  const { authCode, redirectUri } = yield* startCallbackServer(
+    config,
+    codeChallenge,
+    state
+  );
+
+  // 5. Exchange authorization code for tokens
+  const tokens = yield* exchangeCodeForTokens(
+    config,
+    authCode,
+    redirectUri,
+    codeVerifier
+  );
+
+  // 6. Save tokens to disk
+  yield* storage.save({
+    refreshToken: tokens.refresh_token,
+    accessToken: tokens.access_token,
+    tokenExpirationTime: Date.now() + (tokens.expires_in || 3600) * 1000
+  });
+
+  yield* Effect.log('Login successful');
+  return true as const;
+});
+```
+
+### What Makes This Powerful?
+
+<Steps>
+  <Step title="Type-Safe Errors">
+    Every `yield*` can fail with a **typed error** (e.g., `OAuthDiscoveryError`, `TokenExchangeError`).
+  </Step>
+  <Step title="Automatic Retries">
+    Add `.pipe(Effect.retry(Schedule.exponential('100 millis')))` for automatic retries.
+  </Step>
+  <Step title="Timeouts">
+    Add `.pipe(Effect.timeout('30 seconds'))` to prevent hanging.
+  </Step>
+  <Step title="Tracing">
+    Use `Effect.annotateCurrentSpan('key', value)` to add context for debugging.
+  </Step>
+</Steps>
+
+## CLI Commands with @effect/cli
+
+Commands are defined with `Command.make` from `@effect/cli`:
+
+```typescript packages/cli/src/commands/platform/deploy/index.ts
+import { Command } from '@effect/cli';
+import { Console, Effect } from 'effect';
+
+export const deployCommand = Command.make('deploy', {}, () =>
+  Effect.gen(function* () {
+    const projectConfig = yield* ProjectConfigService;
+    const deploymentApi = yield* DeploymentApiService;
+    const archiveService = yield* ArchiveService;
+
+    // Resolve config
+    yield* Console.log('Creating deployment...');
+    const { config } = yield* projectConfig.resolve(process.cwd());
+
+    // Create deployment
+    const deploymentId = yield* deploymentApi.createDeployment('app-id');
+    yield* Console.log(`Deployment ID: ${deploymentId}`);
+
+    // Create and upload archive
+    yield* Console.log('Uploading archive...');
+    yield* uploadArchive(deploymentId, archivePath);
+
+    // Poll for status
+    yield* pollDeployment(deploymentId);
+  }).pipe(
+    Effect.catchTags({
+      ConfigNotFoundError: (err) => Console.error(err.message),
+      DeploymentCreateError: (err) => Console.error(`Deployment failed: ${err.message}`),
+      UploadPartError: (err) => Console.error(`Upload failed: ${err.message}`)
+    })
+  )
+);
+```
+
+## Effect.fn for Tracing
+
+Use `Effect.fn` for **service methods with parameters** to enable automatic tracing:
+
+```typescript
+const detect = Effect.fn('PackageManagerService.detect')(function* (cwd: string) {
+  yield* Effect.annotateCurrentSpan('cwd', cwd);
+  
+  const hasFile = (name: string) =>
+    Effect.tryPromise({
+      try: () => fs.promises.access(path.join(cwd, name)),
+      catch: () => false
+    }).pipe(Effect.map(() => true));
+
+  const hasPnpm = yield* hasFile('pnpm-lock.yaml');
+  const hasYarn = yield* hasFile('yarn.lock');
+  const hasBun = yield* hasFile('bun.lockb');
+
+  if (hasPnpm) return 'pnpm';
+  if (hasYarn) return 'yarn';
+  if (hasBun) return 'bun';
+  return 'npm';
+});
+```
+
+<Info>
+The span name (`PackageManagerService.detect`) appears in traces and logs for debugging.
+</Info>
+
+## Best Practices
+
+### ✅ DO
+
+<AccordionGroup>
+  <Accordion title="Use Effect.Service for all business logic" icon="check">
+    ```typescript
+    export class MyService extends Effect.Service<MyService>()('MyService', {
+      accessors: true,
+      effect: Effect.gen(function* () {
+        // ...
+      })
+    }) {}
+    ```
+  </Accordion>
+
+  <Accordion title="Use Schema.TaggedError for errors" icon="check">
+    ```typescript
+    export class MyError extends Schema.TaggedError<MyError>()('MyError', {
+      message: Schema.String
+    }) {}
+    ```
+  </Accordion>
+
+  <Accordion title="Use Effect.log for structured logging" icon="check">
+    ```typescript
+    yield* Effect.log('Creating deployment', { applicationId, region });
+    ```
+  </Accordion>
+
+  <Accordion title="Use Config.* for environment variables" icon="check">
+    ```typescript
+    const apiUrl = Config.string('API_URL').pipe(
+      Config.withDefault('http://localhost:3000')
+    );
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### ❌ DON'T
+
+<AccordionGroup>
+  <Accordion title="Don't use console.log" icon="xmark">
+    ❌ `console.log('hello')`
+    
+    ✅ `yield* Effect.log('hello')`
+  </Accordion>
+
+  <Accordion title="Don't access process.env directly" icon="xmark">
+    ❌ `process.env.API_URL`
+    
+    ✅ `Config.string('API_URL')`
+  </Accordion>
+
+  <Accordion title="Don't throw Error" icon="xmark">
+    ❌ `throw new Error('Not found')`
+    
+    ✅ `yield* Effect.fail(new NotFoundError({ message: 'Not found' }))`
+  </Accordion>
+
+  <Accordion title="Don't use singletons" icon="xmark">
+    ❌ `export const myService = new MyService()`
+    
+    ✅ `export class MyService extends Effect.Service<MyService>()(...) {}`
+  </Accordion>
+</AccordionGroup>
+
+## Effect Language Server
+
+The CLI uses **@effect/language-service** for enhanced TypeScript support:
+
+- ✅ Effect-specific diagnostics
+- ✅ Hover info with effect signatures
+- ✅ Refactoring support
+- ✅ Auto-completion for Effect APIs
+
+**Enable in VSCode:**
+1. Open Command Palette (F1)
+2. "TypeScript: Select TypeScript Version"
+3. "Use Workspace Version"
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Structure" icon="sitemap" href="/concepts/monorepo-structure">
+    Learn about the monorepo organization and package structure
+  </Card>
+  <Card title="Deployment Workflow" icon="rocket" href="/concepts/deployment-workflow">
+    Understand how deployments flow from CLI to production
+  </Card>
+</CardGroup>

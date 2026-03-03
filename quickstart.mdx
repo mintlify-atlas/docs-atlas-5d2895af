@@ -1,80 +1,350 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with the Gigadrive SDK in minutes - learn the basics of using common utilities and core features.
 ---
 
-## Get started in three steps
+# Quick Start
 
-Get your documentation site running locally and make your first customization.
+This guide will get you up and running with the Gigadrive SDK in just a few minutes. We'll install the `@gigadrive/commons` package and explore some of its most useful utilities.
 
-### Step 1: Set up your local environment
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Install the Package">
+    First, install `@gigadrive/commons` in your project:
 
-### Step 2: Deploy your changes
+    <CodeGroup>
+    ```bash npm
+    npm install @gigadrive/commons
+    ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash yarn
+    yarn add @gigadrive/commons
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash pnpm
+    pnpm add @gigadrive/commons
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash bun
+    bun add @gigadrive/commons
+    ```
+    </CodeGroup>
+  </Step>
 
-### Step 3: Go live
+  <Step title="Create Your First File">
+    Create a new file called `example.ts`:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```typescript example.ts
+    import { formatFileSize, deepMerge, sha256 } from '@gigadrive/commons';
 
-## Next steps
+    console.log('Gigadrive SDK Quick Start');
+    ```
+  </Step>
+</Steps>
 
-Now that you have your docs running, explore these key features:
+## Common Utilities
 
-<CardGroup cols={2}>
+Let's explore some of the most useful utilities in `@gigadrive/commons`.
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+### Format File Sizes
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+Convert bytes to human-readable file sizes:
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+```typescript
+import { formatFileSize } from '@gigadrive/commons';
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+// Convert various file sizes
+console.log(formatFileSize(1234));          // "1.21 KB"
+console.log(formatFileSize(123456789));     // "117.74 MB"
+console.log(formatFileSize(1073741824));    // "1 GB"
+console.log(formatFileSize(0));             // "0 B"
+```
 
-</CardGroup>
+<Tip>
+  `formatFileSize` is perfect for displaying upload progress, file listings, or storage quotas in your UI.
+</Tip>
+
+### Deep Merge Objects
+
+Merge multiple objects deeply, with array concatenation:
+
+```typescript
+import { deepMerge } from '@gigadrive/commons';
+
+const defaults = {
+  theme: 'light',
+  features: ['auth', 'api'],
+  config: {
+    timeout: 3000,
+    retries: 3
+  }
+};
+
+const userSettings = {
+  theme: 'dark',
+  features: ['analytics'],
+  config: {
+    timeout: 5000
+  }
+};
+
+const merged = deepMerge(defaults, userSettings);
+
+console.log(merged);
+// Output:
+// {
+//   theme: 'dark',                              // overwritten
+//   features: ['auth', 'api', 'analytics'],    // concatenated
+//   config: {
+//     timeout: 5000,                           // overwritten
+//     retries: 3                               // preserved
+//   }
+// }
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  `deepMerge` supports multiple partial objects and safely handles prototype pollution by ignoring `__proto__` and `constructor` keys.
+</Note>
+
+### Hash Strings with SHA-256
+
+Generate SHA-256 hashes for strings:
+
+```typescript
+import { sha256 } from '@gigadrive/commons';
+
+const hash = await sha256('Hello, Gigadrive!');
+console.log(hash);
+// Output: "a3c4d5e6f7... (64-character hex string)"
+```
+
+### Encrypt and Decrypt Data
+
+Securely encrypt and decrypt strings using AES-GCM:
+
+```typescript
+import { encrypt, decrypt } from '@gigadrive/commons';
+
+const secretKey = 'my-secret-key';
+const message = 'Sensitive data';
+
+// Encrypt
+const encrypted = await encrypt(message, secretKey);
+console.log('Encrypted:', encrypted);
+// Output: "SGVsbG8gV29ybGQh..." (base64 string)
+
+// Decrypt
+const decrypted = await decrypt(encrypted, secretKey);
+console.log('Decrypted:', decrypted);
+// Output: "Sensitive data"
+```
+
+<Tip>
+  The encryption uses AES-GCM with a 256-bit key derived from your password via SHA-256. Each encryption generates a random IV for maximum security.
+</Tip>
+
+### Sleep Utility
+
+Add delays with a Promise-based sleep function:
+
+```typescript
+import { sleep } from '@gigadrive/commons';
+
+async function example() {
+  console.log('Starting...');
+  await sleep(2000); // Wait 2 seconds
+  console.log('2 seconds later!');
+}
+```
+
+## Complete Example
+
+Here's a complete example that demonstrates multiple utilities:
+
+<CodeGroup>
+```typescript example.ts
+import {
+  formatFileSize,
+  deepMerge,
+  sha256,
+  encrypt,
+  decrypt,
+  sleep
+} from '@gigadrive/commons';
+
+async function demo() {
+  console.log('=== Gigadrive SDK Demo ===\n');
+
+  // 1. Format file sizes
+  console.log('File Sizes:');
+  console.log(`  ${formatFileSize(1234567)}`);
+  console.log(`  ${formatFileSize(9876543210)}\n`);
+
+  // 2. Deep merge configuration
+  const config = deepMerge(
+    { api: { timeout: 3000 }, features: ['auth'] },
+    { api: { retries: 5 }, features: ['logging'] }
+  );
+  console.log('Merged Config:', config);
+  console.log();
+
+  // 3. Hash a string
+  const hash = await sha256('gigadrive-sdk');
+  console.log('SHA-256 Hash:', hash.substring(0, 16) + '...');
+  console.log();
+
+  // 4. Encrypt and decrypt
+  const secret = 'my-encryption-key';
+  const data = 'Hello, Gigadrive!';
+  const encrypted = await encrypt(data, secret);
+  const decrypted = await decrypt(encrypted, secret);
+  
+  console.log('Encryption:');
+  console.log(`  Original: ${data}`);
+  console.log(`  Encrypted: ${encrypted.substring(0, 20)}...`);
+  console.log(`  Decrypted: ${decrypted}`);
+  console.log();
+
+  // 5. Sleep
+  console.log('Waiting 1 second...');
+  await sleep(1000);
+  console.log('Done!');
+}
+
+demo().catch(console.error);
+```
+
+```javascript example.js
+const {
+  formatFileSize,
+  deepMerge,
+  sha256,
+  encrypt,
+  decrypt,
+  sleep
+} = require('@gigadrive/commons');
+
+async function demo() {
+  console.log('=== Gigadrive SDK Demo ===\n');
+
+  // Format file sizes
+  console.log('File Sizes:');
+  console.log(`  ${formatFileSize(1234567)}`);
+  console.log(`  ${formatFileSize(9876543210)}\n`);
+
+  // Deep merge
+  const config = deepMerge(
+    { api: { timeout: 3000 }, features: ['auth'] },
+    { api: { retries: 5 }, features: ['logging'] }
+  );
+  console.log('Merged Config:', config);
+  console.log();
+
+  // Hash
+  const hash = await sha256('gigadrive-sdk');
+  console.log('SHA-256 Hash:', hash.substring(0, 16) + '...');
+  console.log();
+
+  // Encrypt/decrypt
+  const secret = 'my-encryption-key';
+  const data = 'Hello, Gigadrive!';
+  const encrypted = await encrypt(data, secret);
+  const decrypted = await decrypt(encrypted, secret);
+  
+  console.log('Encryption:');
+  console.log(`  Original: ${data}`);
+  console.log(`  Encrypted: ${encrypted.substring(0, 20)}...`);
+  console.log(`  Decrypted: ${decrypted}`);
+  console.log();
+
+  // Sleep
+  console.log('Waiting 1 second...');
+  await sleep(1000);
+  console.log('Done!');
+}
+
+demo().catch(console.error);
+```
+</CodeGroup>
+
+Run the example:
+
+```bash
+node example.js
+# or with TypeScript
+ts-node example.ts
+```
+
+## Next Steps
+
+Now that you've seen the basics, explore more of the SDK:
+
+<CardGroup cols={2}>
+  <Card title="CLI Tool" icon="terminal" href="/cli-reference">
+    Deploy and manage your applications with the Gigadrive CLI
+  </Card>
+  <Card title="Network Config" icon="gear" href="/network-config">
+    Configure deployments with framework auto-detection
+  </Card>
+  <Card title="UI Components" icon="palette" href="/harmony">
+    Build beautiful UIs with the Harmony component library
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Configuration Management
+
+```typescript
+import { deepMerge } from '@gigadrive/commons';
+
+function loadConfig(userConfig = {}) {
+  const defaults = {
+    environment: 'production',
+    port: 3000,
+    features: {
+      auth: true,
+      logging: true
+    }
+  };
+
+  return deepMerge(defaults, userConfig);
+}
+```
+
+### Data Validation
+
+```typescript
+import { sha256 } from '@gigadrive/commons';
+
+async function verifyIntegrity(data: string, expectedHash: string) {
+  const hash = await sha256(data);
+  return hash === expectedHash;
+}
+```
+
+### Secure Storage
+
+```typescript
+import { encrypt, decrypt } from '@gigadrive/commons';
+
+class SecureStorage {
+  constructor(private key: string) {}
+
+  async save(data: string): Promise<string> {
+    return await encrypt(data, this.key);
+  }
+
+  async load(encrypted: string): Promise<string> {
+    return await decrypt(encrypted, this.key);
+  }
+}
+```
+
+<Note>
+  All utilities in `@gigadrive/commons` are tree-shakeable, so your bundler will only include the functions you actually use.
 </Note>

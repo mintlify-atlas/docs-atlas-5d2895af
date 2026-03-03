@@ -1,0 +1,120 @@
+---
+title: "Archive Utilities"
+description: "Create and extract archives (planned feature)"
+---
+
+## Overview
+
+The `@gigadrive/build-utils` package includes `archiver` and `extract-zip` as dependencies, indicating planned support for archive operations.
+
+<Note>
+  Archive utilities are currently in development. This page documents the planned functionality based on the package dependencies.
+</Note>
+
+## Planned Features
+
+Based on the package dependencies, the following archive operations are planned:
+
+### Archive Creation
+
+Using the `archiver` library (v7.0.1+), the package will support:
+
+- Creating ZIP archives
+- Creating TAR archives (with optional compression)
+- Streaming archive creation for large file sets
+- Adding files and directories to archives
+- Custom compression levels
+
+### Archive Extraction
+
+Using the `extract-zip` library (v2.0.1+), the package will support:
+
+- Extracting ZIP archives
+- Streaming extraction for large archives
+- Custom output directories
+- Preserving file permissions
+
+## Dependencies
+
+The following libraries are already included:
+
+<ParamField path="archiver" type="^7.0.1">
+  For creating archives in various formats
+</ParamField>
+
+<ParamField path="extract-zip" type="^2.0.1">
+  For extracting ZIP archives
+</ParamField>
+
+<ParamField path="adm-zip" type="^0.5.16" devDependency>
+  Alternative ZIP library available for development
+</ParamField>
+
+## Expected API (Draft)
+
+While the implementation is pending, the API may look similar to:
+
+```typescript
+import { createArchive, extractArchive } from '@gigadrive/build-utils';
+
+// Create a ZIP archive
+await createArchive({
+  sourceDir: '/path/to/source',
+  outputPath: '/path/to/output.zip',
+  format: 'zip',
+  compressionLevel: 9,
+});
+
+// Extract a ZIP archive
+await extractArchive({
+  archivePath: '/path/to/archive.zip',
+  outputDir: '/path/to/output',
+});
+```
+
+<Warning>
+  The API shown above is a draft and may change when the feature is implemented.
+</Warning>
+
+## Current Status
+
+As of version `1.0.1`, archive utilities are not yet exported from the package. The current exports are:
+
+- `exec` - Command execution
+- `downloadFile` - File downloads
+- `getFilesForPattern` - File pattern matching
+
+See [File Operations](/api/build-utils/file-operations) for currently available utilities.
+
+## Workaround
+
+Until archive utilities are implemented, you can use the underlying libraries directly:
+
+```typescript
+import archiver from 'archiver';
+import extract from 'extract-zip';
+import { createWriteStream } from 'fs';
+
+// Create ZIP with archiver
+const output = createWriteStream('/path/to/output.zip');
+const archive = archiver('zip', { zlib: { level: 9 } });
+archive.pipe(output);
+archive.directory('/path/to/source', false);
+await archive.finalize();
+
+// Extract ZIP with extract-zip
+await extract('/path/to/archive.zip', { dir: '/path/to/output' });
+```
+
+## Contributing
+
+If you'd like to contribute archive utility implementations, please:
+
+1. Check the [GitHub repository](https://github.com/Gigadrive/sdk) for open issues
+2. Follow the coding conventions in the existing utilities
+3. Add comprehensive tests for archive operations
+4. Ensure streaming support for large files
+
+<Tip>
+  When implementing archive utilities, consider the patterns used in `exec` and `downloadFile` for consistency with the existing API design.
+</Tip>

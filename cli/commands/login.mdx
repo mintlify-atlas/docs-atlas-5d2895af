@@ -1,0 +1,116 @@
+---
+title: gigadrive login
+description: Authenticate with the Gigadrive Network using OAuth
+---
+
+The `gigadrive login` command initiates an OAuth authentication flow to log in to the Gigadrive Network. Upon successful authentication, credentials are stored locally in `~/.gigadrive/auth.json` for subsequent commands.
+
+## Usage
+
+```bash
+gigadrive login
+```
+
+## Description
+
+The login command performs the following steps:
+
+1. Initiates an OAuth 2.0 authorization code flow with PKCE
+2. Opens your default browser to the Gigadrive identity provider
+3. Waits for you to complete authentication
+4. Exchanges the authorization code for access and refresh tokens
+5. Stores credentials securely in your home directory
+6. Fetches and displays your user information
+
+The command uses OpenID Connect (OIDC) discovery to automatically configure the OAuth endpoints from the issuer URL.
+
+## Examples
+
+### Basic login
+
+```bash
+gigadrive login
+```
+
+**Output:**
+```
+Initiating login...
+You are now logged in as jane@example.com.
+```
+
+### After successful login
+
+Your authentication tokens are stored in `~/.gigadrive/auth.json`. The CLI will automatically use these credentials for authenticated API calls.
+
+## Authentication Flow
+
+<Steps>
+  <Step title="Start login">
+    The CLI generates a code verifier and challenge for PKCE, then constructs the authorization URL.
+  </Step>
+  <Step title="Browser authorization">
+    Your browser opens to the Gigadrive identity provider login page. After you authenticate, you'll be redirected to a callback URL with an authorization code.
+  </Step>
+  <Step title="Token exchange">
+    The CLI exchanges the authorization code for access and refresh tokens using the OIDC token endpoint.
+  </Step>
+  <Step title="Store credentials">
+    Tokens are persisted to `~/.gigadrive/auth.json` with secure file permissions.
+  </Step>
+  <Step title="Fetch user info">
+    The CLI calls the OIDC userinfo endpoint to retrieve your user profile and display your login identity.
+  </Step>
+</Steps>
+
+## Error Handling
+
+The command handles several error scenarios:
+
+| Error Type | Description | Resolution |
+|------------|-------------|------------|
+| `LoginFlowError` | OAuth flow failed or was cancelled | Retry the login command |
+| `TokenExchangeError` | Failed to exchange authorization code for tokens | Check network connectivity and retry |
+| `OAuthDiscoveryError` | Unable to discover OIDC endpoints | Verify the issuer URL configuration |
+| `AuthStorageWriteError` | Failed to write credentials to disk | Check file permissions for `~/.gigadrive/` |
+
+## Configuration
+
+The login command respects the following environment variables:
+
+<ParamField path="GIGADRIVE_NETWORK_OAUTH_ISSUER_URL" type="string" default="https://idp.gigadrive.de">
+  The OpenID Connect issuer URL for authentication.
+</ParamField>
+
+<ParamField path="GIGADRIVE_NETWORK_OAUTH_CLIENT_ID" type="string" default="todo_add_client_id">
+  The OAuth 2.0 client ID for the CLI application.
+</ParamField>
+
+## Stored Credentials
+
+Credentials are stored in JSON format at `~/.gigadrive/auth.json`:
+
+```json
+{
+  "refreshToken": "...",
+  "accessToken": "...",
+  "tokenExpirationTime": 1234567890
+}
+```
+
+<Warning>
+  Keep your `~/.gigadrive/auth.json` file secure. It contains credentials that grant access to your Gigadrive account. Do not commit this file to version control.
+</Warning>
+
+## Related Commands
+
+- [`gigadrive whoami`](/cli/commands/whoami) - Display current user information
+
+## Implementation
+
+The login command is implemented using Effect-TS with the following services:
+
+- **AuthService** - Manages the OAuth flow and token operations
+- **OAuthConfigService** - Handles OIDC discovery and configuration
+- **AuthStorageService** - Persists tokens to the filesystem
+
+Source: `packages/cli/src/commands/login/index.ts:5`

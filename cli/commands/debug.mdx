@@ -1,0 +1,302 @@
+---
+title: gigadrive debug
+description: Debug and inspect your Gigadrive CLI configuration
+---
+
+The `gigadrive debug` command provides utilities to inspect and troubleshoot your Gigadrive project configuration. It includes subcommands for viewing resolved configuration and diagnosing deployment issues.
+
+## Usage
+
+```bash
+gigadrive debug <subcommand>
+```
+
+## Subcommands
+
+<CardGroup cols={2}>
+  <Card title="config" icon="file-code" href="#config">
+    Display resolved project configuration from `gigadrive.yaml`
+  </Card>
+  <Card title="Coming Soon" icon="wrench">
+    Additional debug utilities will be added in future releases
+  </Card>
+</CardGroup>
+
+---
+
+## gigadrive debug config
+
+Display the fully resolved configuration for your project, including auto-detected framework settings and merged defaults.
+
+### Usage
+
+```bash
+gigadrive debug config
+```
+
+### Description
+
+This command resolves your project configuration using the same logic as `gigadrive platform deploy`:
+
+1. Searches for `gigadrive.yaml` in the current directory and parent directories
+2. If found, parses and validates the configuration
+3. If not found, auto-detects your framework from `package.json` and project files
+4. Applies framework defaults and post-processing (e.g., Vercel Build Output v3 rules)
+5. Displays the final merged configuration as formatted JSON
+
+This is useful for understanding what configuration will be used during deployment and troubleshooting configuration issues.
+
+### Examples
+
+#### View resolved configuration
+
+```bash
+cd my-nextjs-app
+gigadrive debug config
+```
+
+**Output:**
+```
+Config file found at: /home/user/my-nextjs-app/gigadrive.yaml
+{
+  "framework": "nextjs",
+  "rootDirectory": "./",
+  "buildOutputDirectory": ".next",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "environmentVariables": {
+    "NODE_ENV": "production"
+  },
+  "excludeFiles": [
+    "node_modules/**",
+    ".git/**",
+    ".env*"
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
+}
+```
+
+#### Auto-detected configuration
+
+If no `gigadrive.yaml` exists:
+
+```bash
+gigadrive debug config
+```
+
+**Output:**
+```
+Config file found at: /home/user/my-nextjs-app (auto-detected)
+{
+  "framework": "nextjs",
+  "rootDirectory": "./",
+  "buildOutputDirectory": ".next",
+  ...
+}
+```
+
+### Configuration Resolution
+
+The configuration resolver follows this priority:
+
+<Steps>
+  <Step title="User configuration">
+    If `gigadrive.yaml` exists, it is parsed and validated against the schema.
+  </Step>
+  
+  <Step title="Framework detection">
+    If no config file exists, the framework is auto-detected from:
+    - `package.json` dependencies and scripts
+    - Framework-specific config files (`next.config.js`, `remix.config.js`, etc.)
+    - Project structure patterns
+  </Step>
+  
+  <Step title="Framework defaults">
+    Detected frameworks apply default configuration values:
+    - Build commands
+    - Output directories
+    - Routing rules
+    - Environment variables
+  </Step>
+  
+  <Step title="Post-processing">
+    Configuration is post-processed for Vercel Build Output v3 compatibility and platform-specific requirements.
+  </Step>
+  
+  <Step title="Validation">
+    Final configuration is validated against the schema to ensure all required fields are present.
+  </Step>
+</Steps>
+
+### Configuration Fields
+
+The resolved configuration includes the following fields:
+
+<ResponseField name="framework" type="string" required>
+  Detected or specified framework (e.g., `nextjs`, `remix`, `astro`, `static`).
+</ResponseField>
+
+<ResponseField name="rootDirectory" type="string" default="./">
+  Root directory of your project relative to `gigadrive.yaml`.
+</ResponseField>
+
+<ResponseField name="buildOutputDirectory" type="string">
+  Directory where build artifacts are generated (e.g., `.next`, `dist`, `build`).
+</ResponseField>
+
+<ResponseField name="installCommand" type="string">
+  Command to install dependencies (e.g., `npm install`, `pnpm install`).
+</ResponseField>
+
+<ResponseField name="buildCommand" type="string">
+  Command to build the project (e.g., `npm run build`).
+</ResponseField>
+
+<ResponseField name="environmentVariables" type="object">
+  Key-value pairs of environment variables to set during build and runtime.
+</ResponseField>
+
+<ResponseField name="excludeFiles" type="array">
+  Glob patterns for files to exclude from the deployment archive.
+</ResponseField>
+
+<ResponseField name="routes" type="array">
+  Routing rules for the deployment (source patterns and destinations).
+</ResponseField>
+
+<ResponseField name="userArchive" type="object">
+  Custom archive configuration:
+  - `rootOverwrite`: Override the root directory for archiving
+  - `fileWhitelist`: Explicit list of files to include (overrides excludes)
+</ResponseField>
+
+### Error Handling
+
+The command provides detailed error messages for configuration issues:
+
+| Error Type | Description | Resolution |
+|------------|-------------|------------|
+| `ConfigNotFoundError` | No config file found and framework not detected | Create `gigadrive.yaml` or ensure your framework is detectable |
+| `ConfigParseError` | Invalid YAML syntax | Fix syntax errors in `gigadrive.yaml` |
+| `ConfigValidationError` | Configuration doesn't match schema | Review validation errors and fix invalid fields |
+
+### Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Pre-Deployment Check" icon="magnifying-glass">
+    Verify configuration before deploying to catch issues early.
+  </Card>
+  <Card title="Framework Detection" icon="robot">
+    Confirm that your framework was detected correctly.
+  </Card>
+  <Card title="Debug Deployment Issues" icon="bug">
+    Understand why a deployment might be failing due to config.
+  </Card>
+  <Card title="Learn Configuration" icon="graduation-cap">
+    Explore framework defaults to understand what can be customized.
+  </Card>
+</CardGroup>
+
+### Validation Errors
+
+When configuration validation fails, all errors are displayed:
+
+```bash
+gigadrive debug config
+```
+
+**Output:**
+```
+Invalid value for field "buildCommand": must be a string
+Missing required field "framework"
+Config validation failed.
+```
+
+### Supported Frameworks
+
+The debug config command supports all frameworks with auto-detection:
+
+- Next.js
+- Remix
+- Nuxt
+- Astro
+- SvelteKit
+- Vite
+- Create React App
+- Static HTML/CSS/JS
+- Angular
+- Vue
+- And more...
+
+Framework definitions are maintained in `@gigadrive/network-config` at `packages/network-config/src/detection/frameworks/`.
+
+### Configuration File Format
+
+Your `gigadrive.yaml` should follow this format:
+
+```yaml gigadrive.yaml
+# Framework identifier (optional if auto-detectable)
+framework: nextjs
+
+# Project root directory
+rootDirectory: ./
+
+# Build output directory
+buildOutputDirectory: .next
+
+# Build commands (optional, defaults are framework-specific)
+installCommand: pnpm install
+buildCommand: pnpm run build
+
+# Environment variables
+environmentVariables:
+  NODE_ENV: production
+  API_URL: https://api.example.com
+  NEXT_PUBLIC_GA_ID: UA-000000-1
+
+# Files to exclude from deployment
+excludeFiles:
+  - "*.log"
+  - "test/**"
+  - ".cache/**"
+
+# Custom routing rules (optional)
+routes:
+  - src: /api/(.*)
+    dest: /api/$1
+  - src: /(.*)
+    dest: /index.html
+
+# Archive customization (optional)
+userArchive:
+  rootOverwrite: ./dist
+  fileWhitelist:
+    - "**/*.js"
+    - "**/*.html"
+    - "public/**"
+```
+
+<Tip>
+  Use `gigadrive debug config` after creating or modifying your `gigadrive.yaml` to verify that it parses correctly.
+</Tip>
+
+## Related Commands
+
+- [`gigadrive platform deploy`](/cli/commands/deploy) - Deploy with the resolved configuration
+- [`gigadrive build`](/cli/commands/build) - Build your project locally
+
+## Implementation
+
+The debug config command uses the ProjectConfigService to resolve configuration. This service:
+
+- Wraps `@gigadrive/network-config` for framework detection
+- Searches parent directories for `gigadrive.yaml`
+- Uses Effect-TS for structured error handling
+- Returns both the resolved config and the path where it was found
+
+Source: `packages/cli/src/commands/debug/config/index.ts:5`

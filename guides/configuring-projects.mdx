@@ -1,0 +1,517 @@
+---
+title: Configuring Projects
+description: Complete guide to configuring your Gigadrive projects using the v4 configuration schema
+---
+
+The Gigadrive configuration file (`gigadrive.yaml` or `gigadrive.json`) controls every aspect of your deployment, from build commands to runtime settings. This guide covers all available configuration options.
+
+## Configuration File Location
+
+Place your configuration file in your project root:
+
+<CodeGroup>
+```yaml gigadrive.yaml
+version: 4
+build_commands:
+  - npm install
+  - npm run build
+```
+
+```json gigadrive.json
+{
+  "version": 4,
+  "build_commands": [
+    "npm install",
+    "npm run build"
+  ]
+}
+```
+</CodeGroup>
+
+<Tip>
+  YAML is recommended for its readability and support for comments.
+</Tip>
+
+## Schema Version
+
+All configuration files must specify version 4:
+
+```yaml gigadrive.yaml
+version: 4
+```
+
+<Warning>
+  The `version` field is required. Omitting it will result in a validation error.
+</Warning>
+
+## Build Configuration
+
+### Build Commands
+
+Define the commands to build your project:
+
+```yaml gigadrive.yaml
+version: 4
+
+build_commands:
+  - npm install
+  - npm run build
+  - npm run db:migrate
+```
+
+The CLI automatically prepends the appropriate install command based on your package manager:
+
+<CodeGroup>
+```bash npm
+# Detected from package-lock.json
+npm install
+```
+
+```bash pnpm
+# Detected from pnpm-lock.yaml
+pnpm install
+```
+
+```bash yarn
+# Detected from yarn.lock
+yarn install
+```
+
+```bash bun
+# Detected from bun.lockb
+bun install
+```
+
+```bash composer
+# Detected from composer.lock
+composer install
+```
+</CodeGroup>
+
+### Static Assets
+
+Specify the directory containing static assets to deploy to the edge:
+
+```yaml gigadrive.yaml
+assets: ".output/public"
+populateAssetCache: true
+```
+
+<Note>
+  Setting `populateAssetCache: true` caches assets at the edge during deployment, improving first-request performance at the cost of longer deployment times.
+</Note>
+
+## Serverless Functions
+
+Configure runtime settings for your serverless functions:
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    runtime: node-20
+    memory: 1024
+    max_duration: 60
+    includeFiles:
+      - "prisma/**"
+      - "node_modules/.prisma/**"
+    excludeFiles:
+      - "*.test.ts"
+      - "**/__tests__/**"
+```
+
+### Runtime Options
+
+Supported runtimes:
+
+| Runtime | Version | Use Case |
+|---------|---------|----------|
+| `node-22` | Node.js 22.x | Latest Node.js features |
+| `node-20` | Node.js 20.x | LTS (recommended) |
+| `node-18` | Node.js 18.x | Legacy support |
+| `node-16` | Node.js 16.x | Legacy support |
+| `bun-1` | Bun 1.x | High-performance JS/TS runtime |
+| `php-84` | PHP 8.4 | Latest PHP |
+| `php-83` | PHP 8.3 | PHP LTS |
+| `php-81` | PHP 8.1 | Legacy PHP support |
+
+### Memory Allocation
+
+Configure memory from 128 MB to 3009 MB:
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    memory: 512  # MB
+```
+
+<Tip>
+  Higher memory also increases CPU allocation. If your function is CPU-bound, increasing memory can improve performance.
+</Tip>
+
+### Execution Duration
+
+Set maximum execution time (1-900 seconds):
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    max_duration: 30  # seconds
+```
+
+<Warning>
+  Functions exceeding `max_duration` will be terminated. For long-running tasks, consider using a job queue or increasing the timeout.
+</Warning>
+
+### File Inclusion & Exclusion
+
+Control which files are included in function packages:
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    includeFiles:
+      - "prisma/**/*"
+      - ".next/server/**/*"
+      - "public/**/*.wasm"
+    excludeFiles:
+      - "*.test.ts"
+      - "*.spec.ts"
+      - "**/__tests__/**"
+      - "*.md"
+```
+
+Patterns use glob syntax. Exclusions are applied after inclusions.
+
+### Symbolic Links
+
+Create symbolic links in the function package:
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    symlinks:
+      "/var/task/node_modules/.prisma": "prisma/generated"
+```
+
+### Scheduled Functions (Cron)
+
+Schedule functions to run at specific times:
+
+```yaml gigadrive.yaml
+functions:
+  daily-report:
+    runtime: node-20
+    schedule: "cron(0 9 * * ? *)"  # Every day at 9:00 AM UTC
+  
+  cleanup:
+    runtime: node-20
+    schedule: "rate(1 hour)"  # Every hour
+```
+
+Supported schedule formats:
+
+<CodeGroup>
+```yaml Cron Expression
+schedule: "cron(0 12 * * ? *)"  # Daily at noon UTC
+```
+
+```yaml Rate Expression
+schedule: "rate(5 minutes)"  # Every 5 minutes
+```
+</CodeGroup>
+
+## Environment Variables
+
+Set environment variables for both build and runtime:
+
+```yaml gigadrive.yaml
+env:
+  NODE_ENV: production
+  API_BASE_URL: https://api.example.com
+  LOG_LEVEL: info
+  MAX_CONNECTIONS: "100"
+```
+
+<Warning>
+  **Never commit secrets to your configuration file.** Use the Gigadrive dashboard to set sensitive environment variables like API keys and database credentials.
+</Warning>
+
+Environment variables are available in both:
+- Build-time (during `build_commands` execution)
+- Runtime (in your serverless functions)
+
+## Routing Configuration
+
+Define custom routing rules for rewrites, redirects, and header manipulation:
+
+### Basic Rewrites
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/api/:path*"
+    destination: "/api-handler"
+```
+
+### Redirects
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/old-blog/:slug"
+    destination: "/blog/:slug"
+    redirect: true
+    statusCode: 301
+  
+  - source: "/temporary"
+    destination: "/new-location"
+    redirect: true
+    statusCode: 302
+```
+
+### Method Filtering
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/api/users"
+    destination: "/functions/users"
+    methods:
+      - GET
+      - POST
+  
+  - source: "/api/admin/:path*"
+    destination: "/functions/admin"
+    methods:
+      - POST
+      - PUT
+      - DELETE
+```
+
+### Custom Headers
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/assets/:path*"
+    destination: "/static/:path*"
+    headers:
+      Cache-Control: "public, max-age=31536000, immutable"
+      X-Content-Type-Options: "nosniff"
+  
+  - source: "/api/:path*"
+    destination: "/api-handler"
+    headers:
+      Access-Control-Allow-Origin: "*"
+      Access-Control-Allow-Methods: "GET, POST, PUT, DELETE"
+```
+
+### Conditional Routing
+
+Route based on request headers, cookies, or query parameters:
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/feature"
+    destination: "/feature-v2"
+    has:
+      - type: header
+        key: X-Feature-Flag
+        value: "v2"
+  
+  - source: "/api/:path*"
+    destination: "/api-v1/:path*"
+    missing:
+      - type: header
+        key: X-API-Version
+```
+
+Supported condition types:
+- `header` - Match request headers
+- `cookie` - Match cookies
+- `query` - Match query parameters
+- `host` - Match hostname
+
+## Database Services
+
+### PostgreSQL
+
+Provision a managed PostgreSQL database:
+
+```yaml gigadrive.yaml
+services:
+  postgres:
+    postgresVersion: "17"
+    region: us-east-1
+    envBindings:
+      url: DATABASE_URL
+      host: DB_HOST
+      port: DB_PORT
+      user: DB_USER
+      password: DB_PASSWORD
+      database: DB_NAME
+```
+
+Default environment bindings (if not specified):
+- `POSTGRES_URL`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_DATABASE`
+
+### Redis
+
+Provision a managed Redis instance:
+
+```yaml gigadrive.yaml
+services:
+  redis:
+    primaryRegion: us-east-1
+    readRegions:
+      - us-west-2
+      - eu-west-1
+    eviction: true
+    envBindings:
+      url: REDIS_URL
+      host: REDIS_HOST
+      port: REDIS_PORT
+```
+
+<Note>
+  Adding read regions enables global replication but increases costs. Use read regions only if you need low-latency reads across multiple geographies.
+</Note>
+
+## Regional Deployment
+
+Deploy to multiple regions for global low-latency access:
+
+```yaml gigadrive.yaml
+regions:
+  - us-east-1      # US East (N. Virginia)
+  - us-east-2      # US East (Ohio)
+  - us-west-1      # US West (N. California)
+  - us-west-2      # US West (Oregon)
+  - eu-central-1   # Europe (Frankfurt)
+  - eu-west-1      # Europe (Ireland)
+  - eu-west-2      # Europe (London)
+  - sa-east-1      # South America (São Paulo)
+  - ap-south-1     # Asia Pacific (Mumbai)
+  - ap-northeast-1 # Asia Pacific (Tokyo)
+  - ap-southeast-1 # Asia Pacific (Singapore)
+  - ap-southeast-2 # Asia Pacific (Sydney)
+```
+
+Or deploy globally:
+
+```yaml gigadrive.yaml
+regions:
+  - global
+```
+
+## Configuration Presets
+
+Reuse shared configuration across projects:
+
+```yaml gigadrive.yaml
+version: 4
+
+presets:
+  - "https://raw.githubusercontent.com/example/presets/main/nextjs.yaml"
+  - "https://example.com/config/base.yaml"
+
+# Override preset values
+regions:
+  - us-east-1
+```
+
+Presets are applied in order, with later values overriding earlier ones.
+
+## Complete Example
+
+```yaml gigadrive.yaml
+version: 4
+
+# Build configuration
+build_commands:
+  - npm run build
+  - npx prisma migrate deploy
+
+# Static assets
+assets: ".next/static"
+populateAssetCache: true
+
+# Serverless functions
+functions:
+  api:
+    runtime: node-20
+    memory: 1024
+    max_duration: 30
+    includeFiles:
+      - "prisma/**"
+      - "node_modules/.prisma/**"
+    excludeFiles:
+      - "*.test.ts"
+
+# Environment variables
+env:
+  NODE_ENV: production
+  LOG_LEVEL: info
+
+# Routing
+routes:
+  - source: "/:path*"
+    destination: "/api"
+    methods:
+      - ANY
+  
+  - source: "/static/:path*"
+    destination: "/assets/:path*"
+    headers:
+      Cache-Control: "public, max-age=31536000"
+
+# Database services
+services:
+  postgres:
+    postgresVersion: "17"
+    region: us-east-1
+  
+  redis:
+    primaryRegion: us-east-1
+    eviction: true
+
+# Regions
+regions:
+  - us-east-1
+  - eu-west-1
+```
+
+## Validation
+
+Validate your configuration before deploying:
+
+```bash
+gigadrive debug config
+```
+
+This command:
+- Validates against the v4 JSON schema
+- Reports missing required fields
+- Warns about deprecated options
+- Shows the normalized configuration that will be deployed
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Your Application" icon="rocket" href="/guides/deploying-applications">
+    Learn how to deploy with your new configuration
+  </Card>
+  
+  <Card title="Testing Guide" icon="vial" href="/guides/testing">
+    Test your configuration locally
+  </Card>
+  
+  <Card title="Schema Reference" icon="book" href="/api-reference/config/schema">
+    Complete v4 schema documentation
+  </Card>
+  
+  <Card title="Framework Guides" icon="boxes" href="/essentials/frameworks">
+    Framework-specific configuration examples
+  </Card>
+</CardGroup>

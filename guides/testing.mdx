@@ -1,0 +1,566 @@
+---
+title: Testing
+description: Learn how to test your Gigadrive applications using Vitest, Effect-TS testing patterns, and best practices
+---
+
+The Gigadrive SDK uses Vitest as its testing framework across all packages. This guide covers testing strategies for configuration parsing, Effect-TS services, and UI components.
+
+## Testing Setup
+
+### Installation
+
+Install Vitest and related dependencies:
+
+```bash
+npm install -D vitest @vitest/coverage-istanbul
+```
+
+### Configuration
+
+Create a `vitest.config.ts` in your project root:
+
+```ts vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    coverage: {
+      provider: 'istanbul',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
+});
+```
+
+## Writing Tests
+
+### Basic Test Structure
+
+Tests follow this pattern:
+
+```ts example.test.ts
+import { describe, expect, it } from 'vitest';
+import { myFunction } from './example';
+
+describe('myFunction', () => {
+  it('should return expected value', () => {
+    const result = myFunction('input');
+    expect(result).toBe('output');
+  });
+
+  it('should handle edge cases', () => {
+    expect(myFunction('')).toBe('');
+    expect(() => myFunction(null)).toThrow();
+  });
+});
+```
+
+<Note>
+  Test files use the naming convention `<name>.test.ts` and are co-located next to source files.
+</Note>
+
+## Testing Configuration Parsing
+
+The `@gigadrive/network-config` package provides test utilities for mocking the filesystem:
+
+```ts config-parser.test.ts
+import { Effect, Layer } from 'effect';
+import { describe, expect, it } from 'vitest';
+import { makeTestFs, TestPathLayer } from '@gigadrive/network-config/test-utils';
+import { detectFramework } from '@gigadrive/network-config';
+
+describe('detectFramework', () => {
+  it('should detect Next.js from package.json', async () => {
+    const fs = makeTestFs({
+      '/project/package.json': JSON.stringify({
+        dependencies: { next: '^14.0.0', react: '^18.0.0' },
+      }),
+    });
+
+    const result = await Effect.runPromise(
+      detectFramework('/project').pipe(
+        Effect.provide(Layer.merge(fs, TestPathLayer))
+      )
+    );
+
+    expect(result.framework.slug).toBe('nextjs');
+    expect(result.framework.name).toBe('Next.js');
+    expect(result.config.entrypoints[0].path).toBe('.next/standalone/server.js');
+  });
+
+  it('should detect Laravel from composer.json + artisan', async () => {
+    const fs = makeTestFs({
+      '/project/composer.json': JSON.stringify({
+        require: { php: '^8.1', 'laravel/framework': '^11.0' },
+      }),
+      '/project/artisan': '#!/usr/bin/env php',
+      '/project/composer.lock': '',
+    });
+
+    const result = await Effect.runPromise(
+      detectFramework('/project').pipe(
+        Effect.provide(Layer.merge(fs, TestPathLayer))
+      )
+    );
+
+    expect(result.framework.slug).toBe('laravel');
+    expect(result.packageManager).toBe('composer');
+  });
+});
+```
+
+### Testing Error Cases
+
+Test error handling with `catchTag`:
+
+```ts error-handling.test.ts
+import { Effect, Layer } from 'effect';
+import { describe, expect, it } from 'vitest';
+import { makeTestFs, TestPathLayer } from '@gigadrive/network-config/test-utils';
+import { detectFramework } from '@gigadrive/network-config';
+
+describe('framework detection errors', () => {
+  it('should fail when no framework matches', async () => {
+    const fs = makeTestFs({
+      '/project/package.json': JSON.stringify({
+        dependencies: { 'some-unknown-package': '^1.0.0' },
+      }),
+    });
+
+    const result = await Effect.runPromise(
+      detectFramework('/project').pipe(
+        Effect.catchTag('FrameworkNotDetectedError', (e) =>
+          Effect.succeed({ error: e })
+        ),
+        Effect.provide(Layer.merge(fs, TestPathLayer))
+      )
+    );
+
+    expect(result).toHaveProperty('error');
+    expect(result.error._tag).toBe('FrameworkNotDetectedError');
+  });
+});
+```
+
+## Testing Effect-TS Services
+
+When testing services that use Effect-TS, mock dependencies with test layers:
+
+```ts deployment-api.test.ts
+import { ConfigProvider, Effect, Layer, Logger, LogLevel } from 'effect';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthService } from './auth';
+import { DeploymentApiService } from './deployment-api';
+
+const BASE_URL = 'https://api.example.com';
+
+const makeTestLayer = () => {
+  const configLayer = Layer.setConfigProvider(
+    ConfigProvider.fromMap(
+      new Map([['GIGADRIVE_API_BASE_URL', BASE_URL]])
+    )
+  );
+
+  // Mock AuthService
+  const mockAuthService = Layer.succeed(AuthService, {
+    login: Effect.succeed(true),
+    logout: Effect.void,
+    getAccessToken: Effect.succeed('test-auth-token'),
+    getUserInfo: Effect.succeed({}),
+    refreshAccessToken: Effect.succeed(true),
+    inferUserName: () => 'test-user',
+    _tag: 'AuthService',
+  });
+
+  return Layer.provide(
+    DeploymentApiService.Default,
+    Layer.mergeAll(configLayer, mockAuthService)
+  ).pipe(Layer.provideMerge(Logger.minimumLogLevel(LogLevel.None)));
+};
+
+describe('DeploymentApiService', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('should create a deployment', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 'new-dep-id' }),
+    });
+
+    const testLayer = makeTestLayer();
+    const result = await Effect.runPromise(
+      Effect.provide(
+        DeploymentApiService.createDeployment('app-1'),
+        testLayer
+      )
+    );
+
+    expect(result).toBe('new-dep-id');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `${BASE_URL}/app-1/deployments`,
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('should handle deployment creation errors', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('server error details'),
+    });
+
+    const testLayer = makeTestLayer();
+    const result = await Effect.runPromise(
+      Effect.provide(
+        DeploymentApiService.createDeployment('app-1'),
+        testLayer
+      ).pipe(
+        Effect.catchTag('DeploymentCreateError', (err) =>
+          Effect.succeed({
+            _tag: 'caught',
+            message: err.message,
+            statusCode: err.statusCode,
+          })
+        )
+      )
+    );
+
+    expect(result).toMatchObject({ _tag: 'caught', statusCode: 500 });
+  });
+});
+```
+
+## Testing React Components (Harmony)
+
+Test Harmony components using React Testing Library:
+
+```bash
+npm install -D @testing-library/react @testing-library/jest-dom
+```
+
+```tsx Button.test.tsx
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { Button } from '@gigadrive/harmony';
+
+describe('Button', () => {
+  it('should render with default variant', () => {
+    render(<Button>Click me</Button>);
+    const button = screen.getByRole('button', { name: /click me/i });
+    expect(button).toBeInTheDocument();
+  });
+
+  it('should apply variant classes', () => {
+    render(<Button variant="destructive">Delete</Button>);
+    const button = screen.getByRole('button', { name: /delete/i });
+    expect(button).toHaveClass('bg-destructive');
+  });
+
+  it('should handle disabled state', () => {
+    render(<Button disabled>Disabled</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
+  });
+});
+```
+
+## Running Tests
+
+<Steps>
+  <Step title="Run all tests">
+    ```bash
+    npm test
+    ```
+  </Step>
+
+  <Step title="Watch mode">
+    ```bash
+    npm run test:watch
+    ```
+  </Step>
+
+  <Step title="Coverage report">
+    ```bash
+    npm run test:coverage
+    ```
+  </Step>
+
+  <Step title="Run specific test file">
+    ```bash
+    npx vitest run src/config-parser.test.ts
+    ```
+  </Step>
+
+  <Step title="Run tests matching a pattern">
+    ```bash
+    npx vitest run -t "should detect Next.js"
+    ```
+  </Step>
+</Steps>
+
+## Test Organization
+
+### File Structure
+
+```
+src/
+  config-parser.ts
+  config-parser.test.ts      # Co-located with source
+  services/
+    auth.ts
+    auth.test.ts             # Tests next to implementation
+    deployment-api.ts
+    deployment-api.test.ts
+```
+
+<Tip>
+  Co-locating tests with source files makes them easier to maintain and discover.
+</Tip>
+
+### Test Categories
+
+Organize tests into logical categories:
+
+```ts
+describe('ConfigParser', () => {
+  describe('YAML parsing', () => {
+    it('should parse valid YAML', () => {});
+    it('should reject invalid YAML', () => {});
+  });
+
+  describe('JSON parsing', () => {
+    it('should parse valid JSON', () => {});
+    it('should reject invalid JSON', () => {});
+  });
+
+  describe('schema validation', () => {
+    it('should validate required fields', () => {});
+    it('should validate field types', () => {});
+  });
+});
+```
+
+## Mocking Strategies
+
+### Mocking Fetch
+
+```ts
+import { beforeEach, afterEach, vi } from 'vitest';
+
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  globalThis.fetch = vi.fn();
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+it('should fetch data', async () => {
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ data: 'test' }),
+  });
+
+  // Test code here
+});
+```
+
+### Mocking Filesystem
+
+Use `makeTestFs` from `@gigadrive/network-config`:
+
+```ts
+import { makeTestFs, TestPathLayer } from '@gigadrive/network-config/test-utils';
+
+const fs = makeTestFs({
+  '/project/package.json': JSON.stringify({ name: 'my-app' }),
+  '/project/gigadrive.yaml': 'version: 4',
+});
+```
+
+### Mocking Environment Variables
+
+```ts
+import { ConfigProvider, Layer } from 'effect';
+
+const configLayer = Layer.setConfigProvider(
+  ConfigProvider.fromMap(
+    new Map([
+      ['GIGADRIVE_API_BASE_URL', 'http://localhost:3000'],
+      ['NODE_ENV', 'test'],
+    ])
+  )
+);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Descriptive Test Names" icon="tag">
+    Use "should" statements: `it('should validate email format', ...)`
+  </Card>
+  
+  <Card title="Test One Thing" icon="bullseye">
+    Each test should verify a single behavior or assertion.
+  </Card>
+  
+  <Card title="Arrange-Act-Assert" icon="list-ol">
+    Structure tests: setup data, execute code, verify results.
+  </Card>
+  
+  <Card title="Mock External Dependencies" icon="plug">
+    Mock HTTP requests, filesystem, and external services.
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Testing Async Effect Code
+
+```ts
+import { Effect } from 'effect';
+
+it('should handle async operations', async () => {
+  const effect = Effect.gen(function* () {
+    const result = yield* someAsyncOperation;
+    return result * 2;
+  });
+
+  const result = await Effect.runPromise(effect);
+  expect(result).toBe(10);
+});
+```
+
+### Testing Error Scenarios
+
+```ts
+it('should fail with specific error', async () => {
+  const effect = Effect.fail(new ConfigParseError({ message: 'Invalid YAML' }));
+
+  const result = await Effect.runPromise(
+    effect.pipe(
+      Effect.catchTag('ConfigParseError', (err) =>
+        Effect.succeed({ caught: true, message: err.message })
+      )
+    )
+  );
+
+  expect(result.caught).toBe(true);
+  expect(result.message).toBe('Invalid YAML');
+});
+```
+
+### Snapshot Testing
+
+Use snapshots for configuration output:
+
+```ts
+it('should generate correct config', () => {
+  const config = generateConfig(framework, 'npm');
+  expect(config).toMatchSnapshot();
+});
+```
+
+## CI/CD Integration
+
+Gigadrive SDK runs tests in CI:
+
+```yaml .github/workflows/test.yml
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install
+      - run: pnpm test
+      - run: pnpm lint
+      - run: pnpm format
+```
+
+<Warning>
+  All CI checks must pass before merging. Run `pnpm test`, `pnpm lint`, and `pnpm format` locally before pushing.
+</Warning>
+
+## Coverage Requirements
+
+Aim for high test coverage:
+
+```bash
+npm run test:coverage
+```
+
+Coverage thresholds:
+- **Statements**: 80%+
+- **Branches**: 75%+
+- **Functions**: 80%+
+- **Lines**: 80%+
+
+## Debugging Tests
+
+### VSCode Configuration
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Tests",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
+```
+
+### Debug Single Test
+
+```bash
+node --inspect-brk node_modules/.bin/vitest run -t "test name"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploying Applications" icon="rocket" href="/guides/deploying-applications">
+    Learn how to deploy tested applications
+  </Card>
+  
+  <Card title="CI/CD Best Practices" icon="rotate" href="/essentials/ci-cd">
+    Integrate testing into your deployment pipeline
+  </Card>
+  
+  <Card title="Effect-TS Testing" icon="flask" href="https://effect.website/docs/testing">
+    Advanced Effect-TS testing patterns
+  </Card>
+  
+  <Card title="Vitest Documentation" icon="book" href="https://vitest.dev">
+    Complete Vitest API reference
+  </Card>
+</CardGroup>

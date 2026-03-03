@@ -1,0 +1,275 @@
+---
+title: Deploying Applications
+description: Learn how to deploy your applications to Gigadrive Network using the CLI and configuration files
+---
+
+The Gigadrive SDK provides powerful tools for deploying applications to the Gigadrive Network. This guide walks you through the deployment process from initial configuration to monitoring your live application.
+
+## Prerequisites
+
+Before deploying, ensure you have:
+
+- Installed the Gigadrive CLI (`npm install -g gigadrive`)
+- Authenticated with `gigadrive login`
+- Created a `gigadrive.yaml` configuration file in your project root
+
+## Deployment Workflow
+
+<Steps>
+  <Step title="Configure Your Project">
+    Create a `gigadrive.yaml` file in your project root with your deployment configuration:
+
+    ```yaml gigadrive.yaml
+    version: 4
+    
+    build_commands:
+      - npm install
+      - npm run build
+    
+    assets: ".output/public"
+    
+    functions:
+      api:
+        runtime: node-20
+        memory: 512
+        max_duration: 30
+    
+    regions:
+      - us-east-1
+      - eu-west-1
+    
+    env:
+      NODE_ENV: production
+    ```
+
+    <Tip>
+      The Gigadrive CLI can auto-detect popular frameworks like Next.js, Nuxt, Remix, and more. If no config file exists, it will generate one based on your project structure.
+    </Tip>
+  </Step>
+
+  <Step title="Deploy to Gigadrive Network">
+    Run the deploy command from your project directory:
+
+    ```bash
+    gigadrive platform deploy
+    ```
+
+    The CLI will:
+    1. Validate your configuration
+    2. Create a deployment archive
+    3. Upload to Gigadrive Network
+    4. Stream build logs in real-time
+    5. Provision your application across selected regions
+  </Step>
+
+  <Step title="Monitor Deployment Status">
+    The CLI automatically polls deployment status and streams logs:
+
+    ```bash
+    Creating deployment...
+    Deployment ID: dep-abc123
+    Creating archive...
+    Archive created (2.4 MB)
+    Uploading archive...
+    Upload complete.
+    The deployment pipeline is now being provisioned...
+    
+    [BUILD] Installing dependencies...
+    [BUILD] Running build commands...
+    [BUILD] Build complete
+    [DEPLOY] Deploying to us-east-1...
+    [DEPLOY] Deploying to eu-west-1...
+    
+    Deployment successful! 🎉
+    ```
+  </Step>
+</Steps>
+
+## Framework Auto-Detection
+
+Gigadrive automatically detects your framework and applies optimal defaults:
+
+<CodeGroup>
+```json Next.js
+{
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0"
+  }
+}
+// Auto-detected: Next.js
+// Entrypoint: .next/standalone/server.js
+// Runtime: node-20
+```
+
+```json Nuxt
+{
+  "dependencies": {
+    "nuxt": "^3.0.0"
+  }
+}
+// Auto-detected: Nuxt
+// Entrypoint: .output/server/index.mjs
+// Runtime: node-20
+```
+
+```json Remix
+{
+  "dependencies": {
+    "@remix-run/dev": "^2.0.0"
+  }
+}
+// Auto-detected: Remix
+// Runtime: node-20
+```
+
+```json Elysia
+{
+  "dependencies": {
+    "elysia": "^1.0.0"
+  }
+}
+// Auto-detected: Elysia
+// Runtime: bun-1
+```
+</CodeGroup>
+
+## Deployment Regions
+
+Deploy to multiple regions for low-latency global access:
+
+```yaml gigadrive.yaml
+regions:
+  - us-east-1      # US East (N. Virginia)
+  - us-west-2      # US West (Oregon)
+  - eu-west-1      # Europe (Ireland)
+  - eu-central-1   # Europe (Frankfurt)
+  - ap-southeast-1 # Asia Pacific (Singapore)
+  - ap-northeast-1 # Asia Pacific (Tokyo)
+```
+
+<Warning>
+  More regions incur higher costs. Start with 1-2 regions closest to your users and expand as needed.
+</Warning>
+
+## Runtime Configuration
+
+Configure serverless function behavior:
+
+```yaml gigadrive.yaml
+functions:
+  api:
+    runtime: node-20        # node-22, node-20, node-18, bun-1, php-84, php-83
+    memory: 512             # 128-3009 MB
+    max_duration: 30        # 1-900 seconds
+    includeFiles:
+      - "prisma/**"
+      - ".next/server/**"
+    excludeFiles:
+      - "*.test.ts"
+      - "**/*.spec.ts"
+```
+
+## Environment Variables
+
+Securely manage environment variables:
+
+```yaml gigadrive.yaml
+env:
+  NODE_ENV: production
+  API_BASE_URL: https://api.example.com
+  DATABASE_POOL_SIZE: "10"
+```
+
+<Note>
+  For sensitive values like API keys, use the Gigadrive dashboard to set environment variables instead of committing them to your config file.
+</Note>
+
+## Advanced: Custom Routes
+
+Define custom routing rules for rewrites, redirects, and headers:
+
+```yaml gigadrive.yaml
+routes:
+  - source: "/api/:path*"
+    destination: "/api-handler"
+    methods:
+      - GET
+      - POST
+  
+  - source: "/old-page"
+    destination: "/new-page"
+    redirect: true
+    statusCode: 301
+  
+  - source: "/assets/:path*"
+    destination: "/static/:path*"
+    headers:
+      Cache-Control: "public, max-age=31536000, immutable"
+```
+
+## Deployment Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Environment-Specific Configs" icon="gear">
+    Maintain separate configurations for staging and production deployments.
+  </Card>
+  
+  <Card title="Optimize Bundle Size" icon="box">
+    Exclude unnecessary files with `excludeFiles` to reduce upload time and cold start latency.
+  </Card>
+  
+  <Card title="Test Locally First" icon="flask">
+    Use `gigadrive debug config` to validate your configuration before deploying.
+  </Card>
+  
+  <Card title="Monitor Memory Usage" icon="chart-line">
+    Start with conservative memory settings and scale up based on production metrics.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Deployment Fails During Upload
+
+```bash
+Error: UploadPartError: Failed to upload part 3
+```
+
+**Solution:** Check your network connection. The CLI automatically retries failed uploads up to 3 times.
+
+### Build Commands Not Found
+
+```bash
+Error: npm: command not found
+```
+
+**Solution:** Ensure build commands match your package manager. The CLI auto-detects npm, yarn, pnpm, and bun from lockfiles.
+
+### Configuration Validation Error
+
+```bash
+Error: ConfigValidationError: Invalid region 'invalid-region'
+```
+
+**Solution:** Use `gigadrive debug config` to validate your configuration against the v4 schema.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Your Project" icon="sliders" href="/guides/configuring-projects">
+    Deep dive into all configuration options
+  </Card>
+  
+  <Card title="Testing Guide" icon="vial" href="/guides/testing">
+    Learn how to test your application before deployment
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/cli/deploy">
+    View complete CLI command reference
+  </Card>
+  
+  <Card title="Monitoring & Logs" icon="chart-mixed" href="/essentials/monitoring">
+    Monitor your deployed applications
+  </Card>
+</CardGroup>

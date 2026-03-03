@@ -1,0 +1,318 @@
+---
+title: "File Operations"
+description: "Execute commands, download files, and search for files using patterns"
+---
+
+## exec
+
+Executes a command asynchronously in a child process with streaming output support.
+
+### Function Signature
+
+```typescript
+function exec(options: ExecOptions): Promise<void>
+```
+
+### Parameters
+
+<ParamField path="command" type="string | { command: string; args?: string[] }" required>
+  The command to execute. Can be a string (e.g., `"npm install"`) or an object with `command` and optional `args` array.
+</ParamField>
+
+<ParamField path="cwd" type="string" default="process.cwd()">
+  The working directory for the command.
+</ParamField>
+
+<ParamField path="env" type="Record<string, string>">
+  Environment variables for the command. Does not include the current process's environment variables by default.
+</ParamField>
+
+<ParamField path="onOutput" type="(data: string) => void" default="console.log">
+  Callback for handling stdout output from the command.
+</ParamField>
+
+<ParamField path="onError" type="(data: string) => void" default="console.error">
+  Callback for handling stderr output from the command.
+</ParamField>
+
+### Returns
+
+<ResponseField name="Promise<void>" type="Promise<void>">
+  Resolves when the process completes successfully (exit code 0), rejects if the process fails or exits with a non-zero code.
+</ResponseField>
+
+### Example Usage
+
+```typescript
+import { exec } from '@gigadrive/build-utils';
+
+// Simple command execution
+await exec({
+  command: 'npm install',
+  cwd: '/path/to/project',
+});
+
+// Command with custom output handling
+await exec({
+  command: 'npm run build',
+  cwd: '/path/to/project',
+  onOutput: (data) => {
+    console.log(`[BUILD] ${data}`);
+  },
+  onError: (data) => {
+    console.error(`[ERROR] ${data}`);
+  },
+});
+
+// Command with object syntax
+await exec({
+  command: {
+    command: 'git',
+    args: ['clone', 'https://github.com/example/repo.git'],
+  },
+  cwd: '/path/to/repos',
+});
+
+// Command with custom environment variables
+await exec({
+  command: 'npm run deploy',
+  env: {
+    NODE_ENV: 'production',
+    API_KEY: 'secret-key',
+  },
+});
+```
+
+### Error Handling
+
+The function rejects with an error if:
+- The process fails to start
+- The process exits with a non-zero code
+
+```typescript
+try {
+  await exec({ command: 'invalid-command' });
+} catch (error) {
+  if (error instanceof Error) {
+    console.error(error.message);
+    // "Failed to start process: ..." or "Process exited with code ..."
+  }
+}
+```
+
+---
+
+## downloadFile
+
+Downloads a file from a URL using streaming to avoid loading it into memory.
+
+### Function Signature
+
+```typescript
+function downloadFile(url: string, outputPath: string): Promise<void>
+```
+
+### Parameters
+
+<ParamField path="url" type="string" required>
+  The URL of the file to download.
+</ParamField>
+
+<ParamField path="outputPath" type="string" required>
+  The local path where the file should be saved. Parent directories will be created automatically if they don't exist.
+</ParamField>
+
+### Returns
+
+<ResponseField name="Promise<void>" type="Promise<void>">
+  Resolves when the download is complete, rejects if the download fails.
+</ResponseField>
+
+### Example Usage
+
+```typescript
+import { downloadFile } from '@gigadrive/build-utils';
+
+// Download a file
+await downloadFile(
+  'https://example.com/archive.zip',
+  '/path/to/output/archive.zip'
+);
+
+// Download to a directory that doesn't exist yet
+await downloadFile(
+  'https://cdn.example.com/package.tar.gz',
+  '/tmp/downloads/package.tar.gz'
+);
+// The /tmp/downloads directory will be created automatically
+```
+
+### Error Handling
+
+```typescript
+try {
+  await downloadFile(
+    'https://example.com/file.zip',
+    '/path/to/output.zip'
+  );
+} catch (error) {
+  if (error instanceof Error) {
+    console.error(error.message);
+    // "Failed to download file: HTTP error! status: 404"
+    // or "Failed to download file: Response body is null"
+  }
+}
+```
+
+### Features
+
+- Streams the download to avoid memory issues with large files
+- Automatically creates parent directories
+- Handles HTTP errors and network failures
+- Uses native `fetch` API for compatibility
+
+---
+
+## getFilesForPattern
+
+Finds all files that match a glob or regex pattern in a given directory, with support for exclusions.
+
+### Function Signature
+
+```typescript
+function getFilesForPattern(
+  pattern: string,
+  projectFolder: string,
+  excludeFiles?: string | string[]
+): Promise<string[]>
+```
+
+### Parameters
+
+<ParamField path="pattern" type="string" required>
+  The pattern to match files against. Can be a glob pattern (e.g., `"**/*.ts"`) or a regular expression pattern.
+</ParamField>
+
+<ParamField path="projectFolder" type="string" required>
+  The folder to search for files in. The search is recursive.
+</ParamField>
+
+<ParamField path="excludeFiles" type="string | string[]" default="[]">
+  File names, folder names, glob patterns, or regex patterns to exclude from the search.
+</ParamField>
+
+### Returns
+
+<ResponseField name="files" type="string[]">
+  An array of relative file paths that match the pattern and are not excluded.
+</ResponseField>
+
+### Example Usage
+
+```typescript
+import { getFilesForPattern } from '@gigadrive/build-utils';
+
+// Find all TypeScript files
+const tsFiles = await getFilesForPattern(
+  '**/*.ts',
+  '/path/to/project'
+);
+
+// Find TypeScript files, excluding test files
+const sourceFiles = await getFilesForPattern(
+  '**/*.ts',
+  '/path/to/project',
+  ['**/*.test.ts', '**/*.spec.ts']
+);
+
+// Find files matching a regex pattern
+const configFiles = await getFilesForPattern(
+  '^.*\\.config\\.(js|ts)$',
+  '/path/to/project'
+);
+
+// Exclude multiple patterns
+const prodFiles = await getFilesForPattern(
+  '**/*.{ts,tsx}',
+  '/path/to/project',
+  [
+    'node_modules/**',
+    '**/*.test.ts',
+    '**/*.spec.tsx',
+    'dist/**',
+  ]
+);
+```
+
+### Pattern Matching
+
+The function supports both glob patterns and regular expressions:
+
+<Tabs>
+  <Tab title="Glob Patterns">
+    Uses `minimatch` for glob matching:
+    
+    ```typescript
+    // Match all .ts files
+    '**/*.ts'
+    
+    // Match specific files
+    'src/**/*.config.ts'
+    
+    // Match multiple extensions
+    '**/*.{js,ts,jsx,tsx}'
+    ```
+  </Tab>
+  <Tab title="Regular Expressions">
+    If the pattern is a valid regex, it will be used for matching:
+    
+    ```typescript
+    // Match files with .config. in the name
+    '.*\\.config\\.(js|ts)$'
+    
+    // Match versioned files
+    'package-v\\d+\\.json$'
+    ```
+  </Tab>
+</Tabs>
+
+### Exclusions
+
+Exclusions support the same pattern types as the main pattern:
+
+```typescript
+// Exclude by glob
+excludeFiles: ['node_modules/**', 'dist/**']
+
+// Exclude by regex
+excludeFiles: ['.*\\.test\\.(ts|tsx)$']
+
+// Mixed exclusions
+excludeFiles: ['node_modules/**', '.*\\.spec\\.ts$']
+```
+
+### Best Practices
+
+<Warning>
+  Always exclude large directories like `node_modules` to improve performance:
+  
+  ```typescript
+  const files = await getFilesForPattern(
+    '**/*.ts',
+    projectPath,
+    ['node_modules/**', '.git/**']
+  );
+  ```
+</Warning>
+
+<Tip>
+  For complex searches, use glob patterns for readability and regex for advanced matching:
+  
+  ```typescript
+  // Readable glob
+  '**/*.{test,spec}.{ts,tsx}'
+  
+  // Powerful regex
+  '^src/.*\\.(component|service)\\.ts$'
+  ```
+</Tip>

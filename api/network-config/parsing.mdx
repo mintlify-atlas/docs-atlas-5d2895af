@@ -1,0 +1,374 @@
+---
+title: "Config Parsing"
+description: "Parse, validate, and locate Gigadrive Network configuration files"
+---
+
+## Overview
+
+The parsing module provides functions to read, validate, and parse configuration files for Gigadrive Network deployments. It supports YAML and JSON formats with v4 schema validation.
+
+## Core Functions
+
+### parseConfig
+
+Parses a config file, validates it against the JSON Schema, converts it to a `NormalizedConfig`, and applies post-processing (Vercel Build Output v3 merging, empty deployment checks, and function/asset deduplication).
+
+```typescript
+export const parseConfig: Effect.Effect<
+  NormalizedConfig,
+  ConfigFileNotFoundError | ConfigFileParseError | ConfigVersionError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="filePath" type="string" required>
+  Absolute path to the config file
+</ParamField>
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<NormalizedConfig>">
+  Effect that returns the parsed and post-processed configuration
+</ResponseField>
+
+#### Example
+
+```typescript
+import { parseConfig } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = parseConfig('/path/to/gigadrive.yaml', '/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+---
+
+### parseConfigRaw
+
+Parses a config file and validates it against the appropriate JSON Schema, returning a `NormalizedConfig` **without** post-processing. Use this when you need to skip Vercel Build Output v3 merging or other transformations.
+
+```typescript
+export const parseConfigRaw: Effect.Effect<
+  NormalizedConfig,
+  ConfigFileNotFoundError | ConfigFileParseError | ConfigVersionError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="filePath" type="string" required>
+  Absolute path to the config file
+</ParamField>
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<NormalizedConfig>">
+  Effect that returns the parsed configuration without post-processing
+</ResponseField>
+
+#### Example
+
+```typescript
+import { parseConfigRaw } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = parseConfigRaw('/path/to/gigadrive.yaml', '/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+---
+
+### postProcessConfig
+
+Applies post-processing transformers to a `NormalizedConfig`:
+
+- Merges functions/routes from Vercel Build Output v3 (`.vercel/output` directory)
+- Validates that the deployment has at least one function, asset, or route
+- Filters functions from the assets list to prevent duplicates
+
+```typescript
+export const postProcessConfig: Effect.Effect<
+  NormalizedConfig,
+  ConfigFileParseError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="config" type="NormalizedConfig" required>
+  The parsed NormalizedConfig
+</ParamField>
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<NormalizedConfig>">
+  Effect that returns the post-processed configuration
+</ResponseField>
+
+#### Example
+
+```typescript
+import { postProcessConfig } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = postProcessConfig(normalizedConfig, '/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+---
+
+### findConfig
+
+Scans for a known config filename in the given project folder. Checks for the following filenames in order:
+
+- `gigadrive.yaml`
+- `gigadrive.yml`
+- `nebula.yaml`
+- `nebula.yml`
+- `nebula.json`
+
+```typescript
+export const findConfig: Effect.Effect<
+  string | null,
+  never,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="projectFolder" type="string" required>
+  Absolute path to the project root
+</ParamField>
+
+<ResponseField name="return" type="Effect<string | null>">
+  Effect that returns the absolute path to the first matching config file, or `null` if none found
+</ResponseField>
+
+#### Example
+
+```typescript
+import { RawConfigReader } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = Effect.gen(function* () {
+  const reader = yield* RawConfigReader;
+  const configPath = yield* reader.findConfig('/path/to/project');
+  
+  if (configPath) {
+    console.log('Found config at:', configPath);
+  } else {
+    console.log('No config file found');
+  }
+});
+
+await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+---
+
+### readRawConfig
+
+Reads a config file from disk and parses it as YAML or JSON. Returns the raw parsed object with version validation.
+
+```typescript
+export const readRawConfig: Effect.Effect<
+  Record<string, unknown>,
+  ConfigFileNotFoundError | ConfigFileParseError | ConfigFileEmptyError | ConfigVersionError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="filePath" type="string" required>
+  Absolute path to the config file
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional settings
+  
+  <Expandable title="properties">
+    <ParamField path="disableVersionCheck" type="boolean">
+      Skip version field validation (useful for Vercel Build Output files)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="Effect<Record<string, unknown>>">
+  Effect that returns the parsed config as a record
+</ResponseField>
+
+#### Example
+
+```typescript
+import { RawConfigReader } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = Effect.gen(function* () {
+  const reader = yield* RawConfigReader;
+  const config = yield* reader.readRawConfig('/path/to/gigadrive.yaml');
+  
+  console.log('Config version:', config.version);
+});
+
+await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+---
+
+### readConfigFile
+
+Convenience wrapper around `readRawConfig` that returns `null` if the file does not exist. Version checking is disabled, making it suitable for reading Vercel Build Output files.
+
+```typescript
+export const readConfigFile: <T>(configFilePath: string) => Effect.Effect<
+  T | null,
+  ConfigFileParseError | ConfigFileEmptyError,
+  FileSystem.FileSystem | Path.Path
+>
+```
+
+<ParamField path="configFilePath" type="string" required>
+  Absolute path to the config file
+</ParamField>
+
+<ResponseField name="return" type="Effect<T | null>">
+  Effect that returns the parsed object cast to type `T`, or `null` when the file is not found
+</ResponseField>
+
+#### Example
+
+```typescript
+import { RawConfigReader } from '@gigadrive/network-config';
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+import type { Config } from '@gigadrive/network-config/build-output-v3';
+
+const program = Effect.gen(function* () {
+  const reader = yield* RawConfigReader;
+  const config = yield* reader.readConfigFile<Config>(
+    '/path/to/.vercel/output/config.json'
+  );
+  
+  if (config) {
+    console.log('Found Vercel config version:', config.version);
+  }
+});
+
+await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```
+
+## Allowed Config Names
+
+The following filenames are recognized as valid config files:
+
+```typescript
+export const ALLOWED_CONFIG_NAMES = [
+  'gigadrive.yaml',
+  'gigadrive.yml',
+  'nebula.yaml',
+  'nebula.yml',
+  'nebula.json',
+] as const;
+```
+
+## Error Types
+
+The parsing functions may return the following tagged errors:
+
+### ConfigFileNotFoundError
+
+Thrown when the config file does not exist at the specified path.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the missing file
+</ParamField>
+
+### ConfigFileParseError
+
+Thrown when the config file exists but cannot be parsed (invalid YAML/JSON syntax).
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the file that failed to parse
+</ParamField>
+
+<ParamField path="cause" type="string" optional>
+  Underlying parse error message
+</ParamField>
+
+### ConfigFileEmptyError
+
+Thrown when the config file exists but is empty.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the empty file
+</ParamField>
+
+### ConfigVersionError
+
+Thrown when the config file is missing the `version` field or has an unsupported version.
+
+<ParamField path="message" type="string">
+  Error message
+</ParamField>
+
+<ParamField path="filePath" type="string">
+  Path to the config file
+</ParamField>
+
+<ParamField path="version" type="number" optional>
+  The unsupported version number (if present)
+</ParamField>
+
+## Effect Context
+
+All parsing functions require the following Effect services:
+
+- `FileSystem.FileSystem` - File system operations
+- `Path.Path` - Path manipulation
+
+Provide these via `NodeContext.layer` from `@effect/platform-node`:
+
+```typescript
+import { NodeContext } from '@effect/platform-node';
+import { Effect } from 'effect';
+
+const program = parseConfig('/path/to/config.yaml', '/path/to/project');
+
+const result = await Effect.runPromise(
+  program.pipe(Effect.provide(NodeContext.layer))
+);
+```

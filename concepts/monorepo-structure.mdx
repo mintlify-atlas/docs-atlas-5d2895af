@@ -1,0 +1,300 @@
+---
+title: Monorepo Structure
+description: Understanding the Gigadrive SDK monorepo organization and package architecture
+---
+
+The Gigadrive SDK is organized as a **pnpm workspace monorepo** containing the CLI, shared libraries, UI components, and build utilities. This structure enables code sharing, unified tooling, and consistent versioning across all packages.
+
+## Repository Overview
+
+The monorepo contains **7 packages** organized under `packages/` and `local/`:
+
+```bash
+packages/sdk              # @gigadrive/sdk - Core SDK (stub)
+packages/commons          # @gigadrive/commons - Shared utilities
+packages/network-config   # @gigadrive/network-config - Config parsing
+packages/build-utils      # @gigadrive/build-utils - Build utilities
+packages/cli              # gigadrive - CLI tool
+packages/harmony          # @gigadrive/harmony - React UI components
+local/tsup                # @local/tsup - Shared build configs (private)
+```
+
+<Info>
+The `local/` directory contains workspace-private packages that are not published to npm.
+</Info>
+
+## Package Responsibilities
+
+### Core Packages
+
+<AccordionGroup>
+  <Accordion title="@gigadrive/sdk" icon="cube">
+    The main SDK package (currently a stub). Will provide the primary API for interacting with Gigadrive Network.
+  </Accordion>
+
+  <Accordion title="gigadrive (CLI)" icon="terminal">
+    Command-line interface built with Effect-TS and @effect/cli. Provides commands for:
+    - Authentication (`login`, `whoami`)
+    - Deployment (`platform deploy`)
+    - Project building (`build`)
+    - Debugging (`debug config`)
+    
+    **Location:** `packages/cli/`
+  </Accordion>
+</AccordionGroup>
+
+### Shared Libraries
+
+<AccordionGroup>
+  <Accordion title="@gigadrive/commons" icon="toolbox">
+    Shared utilities used across all packages:
+    - **Encryption:** AES-256-GCM encryption helpers
+    - **Hashing:** SHA-256 hashing utilities
+    - **Formatting:** File size formatting, date formatting
+    - **Deep merge:** Object merging utilities
+  </Accordion>
+
+  <Accordion title="@gigadrive/network-config" icon="file-code">
+    Configuration parsing and validation:
+    - Parses `gigadrive.yaml` / `gigadrive.json`
+    - Validates against JSON Schema (v4)
+    - Translates Vercel Build Output v3
+    - Auto-detects web frameworks (Next.js, Nuxt, etc.)
+    - Maps regions and runtimes
+    
+    **Uses Effect-TS** in the detection module for type-safe file I/O.
+  </Accordion>
+
+  <Accordion title="@gigadrive/build-utils" icon="wrench">
+    Build-time utilities:
+    - Command execution (`exec`)
+    - File downloads
+    - Glob pattern matching
+  </Accordion>
+</AccordionGroup>
+
+### UI & Tooling
+
+<AccordionGroup>
+  <Accordion title="@gigadrive/harmony" icon="palette">
+    React component library built with:
+    - **Radix UI** primitives
+    - **Tailwind CSS** for styling
+    - **Rslib** for bundling (unbundled ESM + CJS)
+    
+    Provides UI components for web interfaces and dashboards.
+  </Accordion>
+
+  <Accordion title="@local/tsup" icon="gear">
+    Shared tsup build configuration for all packages. Outputs:
+    - CommonJS (`.js`)
+    - ESM (`.mjs`)
+    - IIFE (for browser)
+    - TypeScript declarations (`.d.ts`)
+    - Source maps
+  </Accordion>
+</AccordionGroup>
+
+## Workspace Configuration
+
+### pnpm Workspace
+
+The repository uses **pnpm workspaces** (v10.28+) for dependency management:
+
+```yaml pnpm-workspace.yaml
+packages:
+  - 'packages/*'
+  - 'local/*'
+```
+
+This enables:
+- **Workspace dependencies:** Packages reference each other with `workspace:*`
+- **Hoisting:** Common dependencies are hoisted to the root `node_modules`
+- **Atomic installs:** All packages install together
+
+### Turborepo
+
+Build orchestration uses **Turborepo** for:
+- **Parallel builds:** Packages build in parallel based on dependency graph
+- **Incremental builds:** Only rebuild changed packages
+- **Remote caching:** CI caches build outputs
+
+```bash
+pnpm build              # Build all packages
+pnpm build:no-cache     # Skip Turbo cache
+pnpm clean              # Remove all dist/ directories
+```
+
+## Package Structure
+
+All packages follow a consistent structure:
+
+```bash
+packages/example/
+  src/
+    index.ts           # Barrel export — re-exports all public modules
+    feature-a.ts       # Feature implementation
+    feature-a.test.ts  # Co-located tests (Vitest)
+    feature-b.ts
+    feature-b.test.ts
+  dist/                # Build output (gitignored)
+    index.js           # CommonJS
+    index.mjs          # ESM
+    index.d.ts         # TypeScript declarations
+  package.json
+  tsconfig.json
+  tsup.config.ts       # Build config (imports @local/tsup)
+```
+
+<Tip>
+All test files (`*.test.ts`) are co-located with their source files and excluded from the build output.
+</Tip>
+
+## Cross-Package Imports
+
+Packages reference each other using scoped imports:
+
+```typescript
+// In packages/cli/src/services/auth.ts
+import { formatBytes } from '@gigadrive/commons';
+import { parseConfig } from '@gigadrive/network-config';
+import { exec } from '@gigadrive/build-utils';
+```
+
+**Within a package**, use relative imports:
+
+```typescript
+// In packages/commons/src/index.ts
+export * from './format-bytes';
+export * from './deep-merge';
+```
+
+## Build System
+
+### Dual Module Output
+
+All packages output **dual ESM + CJS** for maximum compatibility:
+
+```json package.json
+{
+  "main": "./dist/index.js",       // CommonJS entry
+  "module": "./dist/index.mjs",    // ESM entry
+  "types": "./dist/index.d.ts",    // TypeScript declarations
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  }
+}
+```
+
+### Shared Build Config
+
+Most packages use the shared tsup config:
+
+```typescript tsup.config.ts
+import { index } from '@local/tsup';
+export default index;
+```
+
+This provides:
+- ✅ CJS, ESM, and IIFE output
+- ✅ TypeScript declarations
+- ✅ Source maps
+- ✅ All dependencies marked external
+- ✅ Tree-shaking enabled
+
+<Note>
+The `harmony` UI library uses **Rslib** instead of tsup for unbundled component builds.
+</Note>
+
+## Version Management
+
+The monorepo uses **Changesets** for version management:
+
+```bash
+pnpm changeset          # Create a changeset (version bump intent)
+pnpm changeset version  # Apply changesets to package.json files
+pnpm changeset publish  # Publish changed packages to npm
+```
+
+Publishing is **automated via GitHub Actions** on push to `main`.
+
+## Development Workflow
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+
+  <Step title="Build all packages">
+    ```bash
+    pnpm build
+    ```
+  </Step>
+
+  <Step title="Run tests">
+    ```bash
+    pnpm test          # All tests
+    pnpm test:watch    # Watch mode
+    pnpm test:coverage # With coverage
+    ```
+  </Step>
+
+  <Step title="Lint and format">
+    ```bash
+    pnpm lint          # ESLint check
+    pnpm lint:fix      # Auto-fix
+    pnpm format        # Prettier check
+    pnpm format:fix    # Auto-format
+    pnpm typecheck     # TypeScript check
+    ```
+  </Step>
+</Steps>
+
+## CI Pipeline
+
+GitHub Actions runs **four parallel checks** on every PR:
+
+<CardGroup cols={2}>
+  <Card title="Tests" icon="vial">
+    `pnpm test` — Vitest with Istanbul coverage
+  </Card>
+  <Card title="Linting" icon="broom">
+    `pnpm lint` — ESLint v9 flat config
+  </Card>
+  <Card title="Formatting" icon="paintbrush">
+    `pnpm format` — Prettier with auto-sorted imports
+  </Card>
+  <Card title="Type Check" icon="check">
+    `pnpm typecheck` — TypeScript strict mode
+  </Card>
+</CardGroup>
+
+**All four must pass** before merging.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Node.js v22" icon="node-js">
+    Required version (see `.nvmrc`)
+  </Card>
+  <Card title="pnpm 10.28+" icon="cube">
+    Managed via Corepack
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Effect-TS Architecture" icon="layer-group" href="/concepts/effect-ts">
+    Learn how the CLI uses Effect-TS for type-safe side effects
+  </Card>
+  <Card title="Deployment Workflow" icon="rocket" href="/concepts/deployment-workflow">
+    Understand the deployment pipeline from code to production
+  </Card>
+</CardGroup>

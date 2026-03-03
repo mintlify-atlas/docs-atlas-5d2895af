@@ -1,0 +1,108 @@
+---
+title: Introduction
+description: Build powerful cloud-native applications with the Gigadrive SDK - a comprehensive toolkit for TypeScript/JavaScript developers.
+---
+
+# Welcome to Gigadrive SDK
+
+The Gigadrive SDK is a modern, TypeScript-first development toolkit designed to help you build, deploy, and manage cloud-native applications on the Gigadrive Network platform.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in minutes with our quick start guide
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install the SDK packages you need for your project
+  </Card>
+  <Card
+    title="CLI Reference"
+    icon="terminal"
+    href="/cli-reference"
+  >
+    Explore the powerful CLI tool for deployment and management
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference"
+  >
+    Dive deep into the SDK's APIs and utilities
+  </Card>
+</CardGroup>
+
+## What's Included
+
+The Gigadrive SDK is a monorepo containing several focused packages to support your development workflow:
+
+### Core Packages
+
+<CardGroup cols={2}>
+  <Card title="@gigadrive/sdk" icon="box">
+    **Core SDK** - Main SDK package for interacting with Gigadrive Network services
+  </Card>
+  <Card title="@gigadrive/commons" icon="wrench">
+    **Common Utilities** - Shared utilities for encryption, hashing, formatting, and deep merging
+  </Card>
+  <Card title="@gigadrive/network-config" icon="gear">
+    **Network Config** - Configuration parsing and validation for deployments
+  </Card>
+  <Card title="gigadrive" icon="terminal">
+    **CLI Tool** - Command-line interface for building, deploying, and managing applications (aliases: `gigadrive` / `gn`)
+  </Card>
+</CardGroup>
+
+### Additional Packages
+
+<CardGroup cols={2}>
+  <Card title="@gigadrive/harmony" icon="palette">
+    **UI Components** - React component library built on Radix UI and Tailwind CSS
+  </Card>
+  <Card title="@gigadrive/build-utils" icon="hammer">
+    **Build Utilities** - Build-time utilities for file operations, downloads, and glob patterns
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<Steps>
+  <Step title="TypeScript-First">
+    Built with TypeScript for excellent type safety and IDE support. All packages include comprehensive type definitions.
+  </Step>
+  
+  <Step title="Effect-TS Architecture">
+    The CLI uses Effect-TS for end-to-end type safety, structured error handling, and composable dependency injection.
+  </Step>
+  
+  <Step title="Modern Build System">
+    Dual CJS/ESM output with conditional exports ensures compatibility across Node.js and modern bundlers.
+  </Step>
+  
+  <Step title="Framework Detection">
+    Automatic framework detection for Next.js, React, Vue, and more - simplifying deployment configuration.
+  </Step>
+</Steps>
+
+## Philosophy
+
+The Gigadrive SDK is designed with these principles in mind:
+
+- **Developer Experience First** - Clear APIs, excellent TypeScript support, and comprehensive documentation
+- **Composability** - Small, focused packages that work together seamlessly
+- **Type Safety** - Leverage TypeScript's type system to catch errors at compile time
+- **Modern Standards** - Built using current best practices and modern JavaScript features
+
+## Getting Started
+
+Ready to build with Gigadrive? Start with our [Quick Start guide](/quickstart) or jump straight to [Installation](/installation) to add the SDK to your project.
+
+<Note>
+  The Gigadrive SDK requires Node.js v18 or higher. Some packages (like the CLI) require Node.js v20+.
+</Note>

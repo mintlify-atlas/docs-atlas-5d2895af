@@ -1,0 +1,419 @@
+---
+title: "Utilities"
+description: "Common utility functions for object manipulation, hashing, async operations, and more"
+---
+
+## Overview
+
+The utilities module provides a collection of general-purpose functions for common programming tasks including object manipulation, cryptographic hashing, asynchronous operations, URL formatting, and stream handling.
+
+## Object Utilities
+
+### deepMerge()
+
+Deeply merges one or more partial objects into a target object.
+
+```typescript
+import { deepMerge } from '@gigadrive/commons';
+
+const target = { a: 1, b: { c: 2 } };
+const partial = { b: { d: 3 }, e: 4 };
+const result = deepMerge(target, partial);
+// { a: 1, b: { c: 2, d: 3 }, e: 4 }
+```
+
+<ParamField path="target" type="T extends object" required>
+  The target object to merge into. This object is modified in place.
+</ParamField>
+
+<ParamField path="...partials" type="Partial<T>[]" required>
+  One or more partial objects containing properties to merge into the target.
+</ParamField>
+
+<ResponseField name="result" type="T">
+  Returns the modified target object with merged properties from all partial objects.
+</ResponseField>
+
+#### Merge Behavior
+
+- **Objects**: Recursively merged (nested properties are combined)
+- **Arrays**: Concatenated (source arrays are appended to target arrays)
+- **Primitives**: Overwritten (source values replace target values)
+- **Security**: Skips `__proto__` and `constructor` properties to prevent prototype pollution
+
+#### Examples
+
+```typescript
+import { deepMerge } from '@gigadrive/commons';
+
+// Nested object merging
+const config = deepMerge(
+  { api: { timeout: 5000, retries: 3 } },
+  { api: { baseUrl: 'https://api.example.com' } }
+);
+// { api: { timeout: 5000, retries: 3, baseUrl: 'https://api.example.com' } }
+
+// Array concatenation
+const lists = deepMerge(
+  { tags: ['javascript', 'typescript'] },
+  { tags: ['node', 'react'] }
+);
+// { tags: ['javascript', 'typescript', 'node', 'react'] }
+
+// Multiple partials
+const merged = deepMerge(
+  { a: 1 },
+  { b: 2 },
+  { c: 3 }
+);
+// { a: 1, b: 2, c: 3 }
+
+// Overwriting primitives
+const updated = deepMerge(
+  { name: 'John', age: 25 },
+  { age: 26 }
+);
+// { name: 'John', age: 26 }
+```
+
+---
+
+### objectToQueryString()
+
+Converts an object to a URL query string.
+
+```typescript
+import { objectToQueryString } from '@gigadrive/commons';
+
+const query = objectToQueryString({ name: 'John', age: 30 });
+console.log(query); // "?name=John&age=30"
+```
+
+<ParamField path="obj" type="Record<string, string | number | boolean | null | undefined> | undefined">
+  The object to convert. Keys and values will be URL-encoded. Undefined values are skipped.
+</ParamField>
+
+<ResponseField name="queryString" type="string">
+  A string starting with '?' followed by encoded key-value pairs joined with '&'. Returns empty string if input is undefined, or '?' if input is empty.
+</ResponseField>
+
+#### Examples
+
+```typescript
+import { objectToQueryString } from '@gigadrive/commons';
+
+// Basic usage
+objectToQueryString({ name: 'John', age: 30 });
+// "?name=John&age=30"
+
+// Special characters are encoded
+objectToQueryString({ query: 'hello world', filter: 'category=books' });
+// "?query=hello%20world&filter=category%3Dbooks"
+
+// Undefined values are skipped
+objectToQueryString({ name: 'John', age: undefined });
+// "?name=John"
+
+// Boolean values
+objectToQueryString({ active: true, verified: false });
+// "?active=true&verified=false"
+
+// Empty or undefined input
+objectToQueryString(undefined); // ""
+objectToQueryString({}); // "?"
+```
+
+---
+
+### enumDefault()
+
+Returns a default value if the input string is null, undefined, empty, or only whitespace.
+
+```typescript
+import { enumDefault } from '@gigadrive/commons';
+
+const value = enumDefault(userInput, 'DEFAULT');
+```
+
+<ParamField path="value" type="string | null | false | undefined">
+  The input value to check.
+</ParamField>
+
+<ParamField path="defaultValue" type="T extends string" required>
+  The default value to return if input is invalid.
+</ParamField>
+
+<ResponseField name="result" type="T">
+  Returns the input value if valid, otherwise returns the default value.
+</ResponseField>
+
+#### Example
+
+```typescript
+import { enumDefault } from '@gigadrive/commons';
+
+type Environment = 'development' | 'staging' | 'production';
+
+const env = enumDefault<Environment>(
+  process.env.NODE_ENV,
+  'development'
+);
+```
+
+## Cryptographic Utilities
+
+### sha256()
+
+Hashes a string using SHA-256.
+
+```typescript
+import { sha256 } from '@gigadrive/commons';
+
+const hash = await sha256('hello world');
+console.log(hash);
+// "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+```
+
+<ParamField path="value" type="string" required>
+  The string to hash.
+</ParamField>
+
+<ResponseField name="hash" type="Promise<string>">
+  Returns a Promise that resolves to the SHA-256 hash as a hexadecimal string.
+</ResponseField>
+
+#### Use Cases
+
+```typescript
+import { sha256 } from '@gigadrive/commons';
+
+// Generate content fingerprints
+const contentHash = await sha256(JSON.stringify(data));
+
+// Create cache keys
+const cacheKey = `user:${await sha256(userId)}`;
+
+// Verify data integrity
+const originalHash = await sha256(originalContent);
+const currentHash = await sha256(currentContent);
+if (originalHash === currentHash) {
+  console.log('Content unchanged');
+}
+```
+
+## Async Utilities
+
+### sleep()
+
+Pauses execution for a specified duration.
+
+```typescript
+import { sleep } from '@gigadrive/commons';
+
+await sleep(1000); // Wait 1 second
+console.log('Resumed after 1 second');
+```
+
+<ParamField path="ms" type="number" required>
+  The duration to sleep in milliseconds.
+</ParamField>
+
+<ResponseField name="promise" type="Promise<void>">
+  Returns a Promise that resolves after the specified duration.
+</ResponseField>
+
+#### Examples
+
+```typescript
+import { sleep } from '@gigadrive/commons';
+
+// Retry with delay
+async function fetchWithRetry(url: string, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url);
+    } catch (error) {
+      if (i < retries - 1) {
+        await sleep(1000 * (i + 1)); // Exponential backoff
+      }
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
+// Rate limiting
+for (const item of items) {
+  await processItem(item);
+  await sleep(100); // 100ms between items
+}
+```
+
+---
+
+### randomIntInRange()
+
+Generates a random integer between two numbers (inclusive).
+
+```typescript
+import { randomIntInRange } from '@gigadrive/commons';
+
+const dice = randomIntInRange(1, 6);
+console.log(dice); // Random number between 1 and 6
+```
+
+<ParamField path="min" type="number" required>
+  The minimum number (inclusive).
+</ParamField>
+
+<ParamField path="max" type="number" required>
+  The maximum number (inclusive).
+</ParamField>
+
+<ResponseField name="random" type="number">
+  Returns a random integer between min and max (inclusive).
+</ResponseField>
+
+**Throws:**
+- `Error` if min is greater than max
+
+#### Examples
+
+```typescript
+import { randomIntInRange } from '@gigadrive/commons';
+
+// Dice roll
+const roll = randomIntInRange(1, 6);
+
+// Random delay
+const delay = randomIntInRange(1000, 5000);
+await sleep(delay);
+
+// Random selection
+const index = randomIntInRange(0, array.length - 1);
+const randomItem = array[index];
+
+// Negative numbers
+const temperature = randomIntInRange(-10, 10);
+```
+
+---
+
+### all()
+
+Executes promises with a concurrency limit, similar to `Promise.all()` but with controlled parallelism.
+
+```typescript
+import { all } from '@gigadrive/commons';
+
+const results = await all([promise1, promise2, promise3, promise4], 2);
+// Executes 2 promises at a time
+```
+
+<ParamField path="promises" type="Iterable<Promise<T> | T>" required>
+  An iterable of promises or values to execute.
+</ParamField>
+
+<ParamField path="concurrencyLimit" type="number" default="Infinity">
+  Maximum number of promises to execute simultaneously. Defaults to Infinity (same as Promise.all).
+</ParamField>
+
+<ResponseField name="results" type="Promise<T[]>">
+  Returns a Promise that resolves to an array of all results in the same order as the input.
+</ResponseField>
+
+**Throws:**
+- `Error` if concurrency limit is less than or equal to 0
+- Rejects with the first error encountered from any promise
+
+#### Examples
+
+```typescript
+import { all } from '@gigadrive/commons';
+
+// Process files with limited concurrency
+const files = ['file1.txt', 'file2.txt', 'file3.txt', 'file4.txt'];
+const results = await all(
+  files.map(file => processFile(file)),
+  2 // Process 2 files at a time
+);
+
+// API requests with rate limiting
+const userIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const users = await all(
+  userIds.map(id => fetchUser(id)),
+  3 // Max 3 concurrent requests
+);
+
+// Mixed values and promises
+const mixed = await all([1, Promise.resolve(2), 3], 2);
+// [1, 2, 3]
+```
+
+## Stream Utilities
+
+### BufferedReadableStream
+
+A readable stream that buffers data in memory until it is consumed.
+
+```typescript
+import { BufferedReadableStream } from '@gigadrive/commons';
+
+const stream = new BufferedReadableStream();
+stream.writeToBuffer('Hello, ');
+stream.writeToBuffer('World!');
+stream.end();
+
+stream.on('data', (chunk) => {
+  console.log(chunk.toString()); // "Hello, World!"
+});
+```
+
+<ParamField path="options" type="ReadableOptions">
+  Standard Node.js ReadableOptions for stream configuration.
+</ParamField>
+
+#### Methods
+
+**`writeToBuffer(data: string | Buffer | Uint8Array): void`**
+
+Writes data to the internal buffer.
+
+**`getBufferContent(): string`**
+
+Returns the current buffer content as a UTF-8 string.
+
+**`end(): void`**
+
+Marks the stream as ending. The stream will emit 'end' after all buffered data is read.
+
+#### Example
+
+```typescript
+import { BufferedReadableStream } from '@gigadrive/commons';
+import { pipeline } from 'node:stream/promises';
+import { createWriteStream } from 'node:fs';
+
+const stream = new BufferedReadableStream();
+
+// Write data incrementally
+for (const line of lines) {
+  stream.writeToBuffer(line + '\n');
+}
+
+stream.end();
+
+// Pipe to file
+await pipeline(stream, createWriteStream('output.txt'));
+```
+
+## Source Code
+
+View the source code:
+- [deep-merge.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/deep-merge.ts)
+- [sha256.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/sha256.ts)
+- [random.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/random.ts)
+- [sleep.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/sleep.ts)
+- [all.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/all.ts)
+- [object-to-query-string.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/url/object-to-query-string.ts)
+- [buffered-readable-stream.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/buffered-readable-stream.ts)
+- [enum-default.ts](https://github.com/Gigadrive/sdk/blob/main/packages/commons/src/enum-default.ts)

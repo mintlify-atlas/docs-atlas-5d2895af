@@ -1,0 +1,188 @@
+---
+title: gigadrive build
+description: Build your project for deployment to the Gigadrive Network
+---
+
+The `gigadrive build` command installs dependencies and executes the build script defined in your project's `package.json`. It automatically detects your package manager and runs the build in a production environment.
+
+## Usage
+
+```bash
+gigadrive build
+```
+
+## Description
+
+The build command performs the following operations:
+
+1. Validates that a `package.json` file exists in the current directory
+2. Checks for a `build` script in the `scripts` section
+3. Detects your package manager (npm, yarn, pnpm, or bun)
+4. Installs dependencies using the detected package manager
+5. Executes the build script with production environment variables
+
+The build runs with Vercel Build Output v3 compatibility environment variables set (`VERCEL=1`, `NOW_BUILDER=1`, `NEBULA=1`, `NODE_ENV=production`).
+
+## Examples
+
+### Build a Next.js project
+
+```bash
+cd my-nextjs-app
+gigadrive build
+```
+
+**Output:**
+```
+Running: pnpm install
+... installation output ...
+Running: pnpm run build
+... build output ...
+Build completed successfully.
+```
+
+### Build with different package managers
+
+The CLI automatically detects your package manager based on lock files:
+
+<CodeGroup>
+```bash npm
+# Uses npm if package-lock.json exists
+npm install && npm run build
+```
+
+```bash yarn
+# Uses yarn if yarn.lock exists
+yarn install && yarn build
+```
+
+```bash pnpm
+# Uses pnpm if pnpm-lock.yaml exists
+pnpm install && pnpm run build
+```
+
+```bash bun
+# Uses bun if bun.lockb exists
+bun install && bun run build
+```
+</CodeGroup>
+
+## Requirements
+
+Your project must meet the following requirements:
+
+<AccordionGroup>
+  <Accordion title="package.json" icon="file-code">
+    A valid `package.json` file must exist in the current directory.
+  </Accordion>
+  
+  <Accordion title="Build script" icon="hammer">
+    Your `package.json` must define a `build` script:
+    
+    ```json
+    {
+      "scripts": {
+        "build": "next build"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Package manager" icon="box">
+    At least one package manager must be installed (npm, yarn, pnpm, or bun). The CLI detects which one to use based on lock files in your project.
+  </Accordion>
+</AccordionGroup>
+
+## Environment Variables
+
+The build command automatically sets the following environment variables:
+
+<ParamField path="NODE_ENV" type="string" default="production">
+  Indicates the build is for production deployment.
+</ParamField>
+
+<ParamField path="NEBULA" type="string" default="1">
+  Gigadrive platform indicator for framework detection.
+</ParamField>
+
+<ParamField path="VERCEL" type="string" default="1">
+  Vercel Build Output v3 compatibility flag.
+</ParamField>
+
+<ParamField path="NOW_BUILDER" type="string" default="1">
+  Legacy Vercel builder compatibility flag.
+</ParamField>
+
+All existing environment variables from your shell are also passed through to the build process.
+
+## Package Manager Detection
+
+The CLI uses the following priority order to detect your package manager:
+
+1. **bun** - If `bun.lockb` exists
+2. **pnpm** - If `pnpm-lock.yaml` exists
+3. **yarn** - If `yarn.lock` exists
+4. **npm** - Default fallback if no lock file is found
+
+The detection logic is implemented in `PackageManagerService` at `packages/cli/src/services/package-manager.ts:14`
+
+## Error Handling
+
+The build command provides detailed error messages for common issues:
+
+| Error Type | Cause | Resolution |
+|------------|-------|------------|
+| `PackageJsonNotFoundError` | No `package.json` in current directory | Run the command from your project root |
+| `PackageJsonParseError` | Invalid JSON in `package.json` | Fix JSON syntax errors in your `package.json` |
+| `BuildScriptNotFoundError` | No `build` script defined | Add a `build` script to your `package.json` |
+| `PackageManagerNotFoundError` | No package manager detected | Install npm, yarn, pnpm, or bun |
+| `ExecError` | Install or build command failed | Check the error output and fix build errors |
+
+## Build Output
+
+The command streams all output from both the install and build commands directly to your terminal, allowing you to see progress in real-time and debug any issues that occur during the build process.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Pre-Deployment Validation" icon="check-circle">
+    Test your build locally before deploying to ensure it completes successfully.
+  </Card>
+  <Card title="CI/CD Pipelines" icon="code-branch">
+    Use in automated workflows to build your application before deployment.
+  </Card>
+  <Card title="Build Testing" icon="flask">
+    Verify that dependencies install correctly and the build script works.
+  </Card>
+  <Card title="Production Builds" icon="industry">
+    Generate optimized production builds with the correct environment variables.
+  </Card>
+</CardGroup>
+
+## Framework Support
+
+The build command works with any Node.js framework that uses a standard build script:
+
+- Next.js
+- Remix
+- Nuxt
+- Astro
+- SvelteKit
+- Vite projects
+- Create React App
+- And any other framework with a build script
+
+## Related Commands
+
+- [`gigadrive platform deploy`](/cli/commands/deploy) - Build and deploy in one step
+- [`gigadrive debug config`](/cli/commands/debug) - View resolved project configuration
+
+## Implementation
+
+The build command is implemented using Effect-TS with structured error handling. It uses the following services:
+
+- **PackageManagerService** - Detects package manager from lock files
+- **FileSystem** - Validates file existence and reads `package.json`
+- **exec** from `@gigadrive/build-utils` - Executes shell commands with streaming output
+
+Source: `packages/cli/src/commands/build/index.ts:8`
