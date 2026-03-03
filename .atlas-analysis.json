@@ -1,0 +1,133 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Gigadrive SDK",
+  "projectDescription": "TypeScript SDK for the Gigadrive Network cloud platform with deployment tools, UI components, and utilities.",
+  "theme": "aspen",
+  "primaryColor": "#3b82f6",
+  "lightColor": "#60a5fa",
+  "darkColor": "#2563eb",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/monorepo-structure",
+              "concepts/effect-ts",
+              "concepts/deployment-workflow"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/deploying-applications",
+              "guides/configuring-projects",
+              "guides/building-with-harmony",
+              "guides/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Packages",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "@gigadrive/commons",
+            "pages": [
+              "api/commons/overview",
+              "api/commons/encryption",
+              "api/commons/formatting",
+              "api/commons/utilities"
+            ]
+          },
+          {
+            "group": "@gigadrive/network-config",
+            "pages": [
+              "api/network-config/overview",
+              "api/network-config/parsing",
+              "api/network-config/detection",
+              "api/network-config/build-output"
+            ]
+          },
+          {
+            "group": "@gigadrive/build-utils",
+            "pages": [
+              "api/build-utils/overview",
+              "api/build-utils/file-operations",
+              "api/build-utils/archive"
+            ]
+          },
+          {
+            "group": "@gigadrive/harmony",
+            "pages": [
+              "api/harmony/overview",
+              "api/harmony/components",
+              "api/harmony/hooks",
+              "api/harmony/utilities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cli/installation",
+              "cli/authentication"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/commands/login",
+              "cli/commands/whoami",
+              "cli/commands/build",
+              "cli/commands/deploy",
+              "cli/commands/debug"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "cli/configuration/overview",
+              "cli/configuration/environment-variables"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "TypeScript SDK for Gigadrive Network cloud platform",
+    "Effect-TS powered CLI with structured error handling",
+    "Configuration parsing with framework auto-detection",
+    "React UI component library built on Radix UI and Tailwind",
+    "Shared utilities for encryption, hashing, and formatting",
+    "Build utilities for file operations and archiving"
+  ],
+  "publicApiSurface": [
+    "@gigadrive/commons: deepMerge, encrypt, decrypt, formatBytes, sha256Hash, random",
+    "@gigadrive/network-config: parseConfig, findConfig, detectFramework, parseRawConfig",
+    "@gigadrive/build-utils: execCommand, downloadFile, createArchive, globFiles",
+    "@gigadrive/harmony: Button, Input, Card, Dialog, DataTable, useIsMobile, cn",
+    "gigadrive CLI: login, whoami, build, platform deploy, debug config"
+  ]
+}
